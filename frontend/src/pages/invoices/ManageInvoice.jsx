@@ -1,0 +1,344 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { invoicesApi, settingsApi } from '../../api/endpoints';
+import { openViaApi, prefetchPdf, batchPrefetchPdfs, cancelBatchPrefetch } from '../../api/download';
+import { useDataTable } from '../../hooks/useDataTable';
+import { usePermissions } from '../../hooks/usePermissions';
+import { useAuth } from '../../hooks/AuthContext';
+import { errorMessage, useToast } from '../../hooks/ToastContext';
+import DataTable from '../../components/common/DataTable';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import EmailInvoiceDialog from '../../components/common/EmailInvoiceDialog';
+import { formatDateDMY } from '../../utils/date';
+import {
+  AlertIcon,
+  EditIcon,
+  MailIcon,
+  PlusIcon,
+  PrinterIcon,
+  RestoreIcon,
+  SpinnerIcon,
+  TrashIcon,
+} from '../../components/common/Icons';
+
+/* Module-level settings cache — avoid re-fetching on every mount */
+let _settingsCache = null;
+let _settingsFetchedAt = 0;
+const SETTINGS_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCachedCurrency() {
+  if (_settingsCache && Date.now() - _settingsFetchedAt < SETTINGS_TTL) {
+    return _settingsCache;
+  }
+  return null;
+}
+
+export default function ManageInvoice() {
+  const can = usePermissions();
+  // GST-only accounts (e.g. Supervisor) see and manage GST invoices exclusively;
+  // the API filters the list and rejects anything else, the UI just says so.
+  const { gstOnly } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const toast = useToast();
+
+  const isTrashRoute = location.pathname.includes('/trash');
+  const [activeTab, setActiveTab] = useState(isTrashRoute ? 'trash' : 'active');
+  const activeTabRef = useRef(isTrashRoute ? 'trash' : 'active');
+  activeTabRef.current = activeTab;
+
+  const [toDelete, setToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [restoringId, setRestoringId] = useState(null);
+  const [printingId, setPrintingId] = useState(null);
+  const [emailRow, setEmailRow] = useState(null);
+  const [currency, setCurrency] = useState(() => getCachedCurrency() || 'SGD');
+  const [counts, setCounts] = useState({ activeCount: 0, trashCount: 0 });
+
+  const fetcher = useCallback((params) => {
+    return invoicesApi.list({ ...params, trash: activeTabRef.current === 'trash' })
+      .then((res) => {
+        if (res.data?.meta) {
+          setCounts(res.data.meta);
+        }
+        return res;
+      });
+  }, []);
+
+  const table = useDataTable(fetcher, { defaultSort: 'created_at', defaultDir: 'desc' });
+
+  const isFirstMount = useRef(true);
+  useEffect(() => {
+    const tab = location.pathname.includes('/trash') ? 'trash' : 'active';
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      if (tab !== activeTab) {
+        setActiveTab(tab);
+        activeTabRef.current = tab;
+      }
+      return;
+    }
+    setActiveTab(tab);
+    activeTabRef.current = tab;
+    table.setPage(1);
+    table.reload();
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const cached = getCachedCurrency();
+    if (cached) {
+      setCurrency(cached);
+      return;
+    }
+    settingsApi.get()
+      .then((res) => {
+        const cur = res.data?.default_currency || 'SGD';
+        setCurrency(cur);
+        _settingsCache = cur;
+        _settingsFetchedAt = Date.now();
+      })
+      .catch(() => { });
+  }, []);
+
+  const handleTabSwitch = (tab) => {
+    navigate(tab === 'trash' ? '/invoices/trash' : '/invoices');
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      if (activeTab === 'trash') {
+        await invoicesApi.permanentDelete(toDelete.id);
+        toast.success(`Invoice #${toDelete.invoice_no} permanently deleted`);
+      } else {
+        await invoicesApi.remove(toDelete.id);
+        toast.success(`Invoice #${toDelete.invoice_no} moved to trash`);
+      }
+      setToDelete(null);
+      table.reload();
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not complete deletion'));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleRestore = async (row) => {
+    setRestoringId(row.id);
+    try {
+      await invoicesApi.restore(row.id);
+      toast.success(`Invoice #${row.invoice_no} restored to active invoices`);
+      table.reload();
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not restore this invoice'));
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
+
+
+  const handlePrint = useCallback(async (row) => {
+    setPrintingId(row.id);
+    try {
+      await openViaApi(`/invoices/${row.id}/print`);
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not generate the PDF'));
+    } finally {
+      setPrintingId(null);
+    }
+  }, [toast]);
+
+  // Memoized active columns — only recalculates when printingId or currency changes
+  const activeColumns = useMemo(() => [
+    { key: '#', label: '#', render: (_r, serial) => <span className="num text-muted">{serial}</span> },
+    {
+      key: 'invoice_no', label: 'Invoice', sortable: true,
+      render: (r) => <span className="cell-strong">#{r.invoice_no}</span>,
+    },
+    {
+      key: 'invoice_date', label: 'Invoice Date', sortable: true,
+      render: (r) => <span className="num">{formatDateDMY(r.invoice_date)}</span>,
+    },
+    { key: 'companyname', label: 'Company name', render: (r) => <span className="cell-strong">{r.companyname}</span> },
+    { key: 'customer_contact', label: 'Contact', render: (r) => <span className="num">{r.customer_contact || '—'}</span> },
+    {
+      key: 'sub_amount', label: `Total (${currency})`, sortable: true, align: 'right',
+      render: (r) => <span className="num cell-strong">{Number(r.sub_amount).toFixed(2)}</span>,
+    },
+    {
+      key: 'action', label: 'Action',
+      render: (row) => (
+        <div className="row-actions">
+          {can('invoices.print', 'gst_invoices.print') && (
+            <button className="btn-icon icon-print" title="Print / download PDF"
+              disabled={printingId === row.id}
+              onMouseEnter={() => prefetchPdf(`/invoices/${row.id}/print`)}
+              onFocus={() => prefetchPdf(`/invoices/${row.id}/print`)}
+              onClick={() => handlePrint(row)}>
+              {printingId === row.id ? <SpinnerIcon width={15} height={15} /> : <PrinterIcon width={15} height={15} />}
+            </button>
+          )}
+          {can('invoices.print', 'gst_invoices.print') && (
+            <button className="btn-icon icon-email" title="Email invoice to customer"
+              onClick={() => setEmailRow(row)}>
+              <MailIcon width={15} height={15} />
+            </button>
+          )}
+          {can('invoices.edit', 'gst_invoices.edit') && (
+            <button className="btn-icon icon-edit-orange" title="Edit invoice" onClick={() => navigate(`/invoices/${row.id}/edit`)}>
+              <EditIcon width={15} height={15} />
+            </button>
+          )}
+          {can('invoices.delete', 'gst_invoices.delete') && (
+            <button className="btn-icon icon-delete" title="Move to trash" onClick={() => setToDelete(row)}>
+              <TrashIcon width={15} height={15} />
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ], [printingId, currency, can, navigate, handlePrint, setEmailRow]);
+
+  // Memoized trash columns — only recalculates when restoringId or currency changes
+  const trashColumns = useMemo(() => [
+    { key: '#', label: '#', render: (_r, serial) => <span className="num text-muted">{serial}</span> },
+    {
+      key: 'invoice_no', label: 'Invoice', sortable: true,
+      render: (r) => <span className="cell-strong">#{r.invoice_no}</span>,
+    },
+    { key: 'companyname', label: 'Company name', render: (r) => <span className="cell-strong">{r.companyname}</span> },
+    {
+      key: 'deleted_at', label: 'Deleted On', sortable: true,
+      render: (r) => <span className="num">{formatDateDMY(r.deleted_at)}</span>,
+    },
+    {
+      key: 'days_left', label: 'Auto-Deletes In',
+      render: (r) => {
+        const days = r.days_left !== undefined ? r.days_left : 10;
+        const isUrgent = days <= 2;
+        return (
+          <span className={`badge ${isUrgent ? 'badge-danger' : 'badge-warning'}`}>
+            {days === 0 ? 'Expiring today' : `${days} day${days === 1 ? '' : 's'} left`}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'sub_amount', label: `Total (${currency})`, sortable: true, align: 'right',
+      render: (r) => <span className="num cell-strong">{Number(r.sub_amount).toFixed(2)}</span>,
+    },
+    {
+      key: 'action', label: 'Action',
+      render: (row) => (
+        <div className="row-actions">
+          {can('invoices.delete', 'gst_invoices.delete') && (
+            <>
+              <button
+                className="btn-icon icon-restore"
+                title="Restore invoice to active list"
+                disabled={restoringId === row.id}
+                onClick={() => handleRestore(row)}
+              >
+                {restoringId === row.id ? <SpinnerIcon width={15} height={15} /> : <RestoreIcon width={15} height={15} />}
+              </button>
+              <button
+                className="btn-icon icon-delete"
+                title="Permanently delete invoice"
+                onClick={() => setToDelete(row)}
+              >
+                <TrashIcon width={15} height={15} />
+              </button>
+            </>
+          )}
+        </div>
+      ),
+    },
+  ], [restoringId, currency, can]);
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <div className="eyebrow">{isTrashRoute ? (gstOnly ? 'GST Invoice Trash' : 'Invoice Trash') : (gstOnly ? 'GST Invoice' : 'Invoice')}</div>
+          <h1>
+            {isTrashRoute ? (gstOnly ? 'Trash GST Invoices' : 'Trash Invoices') : (gstOnly ? 'Manage GST Invoices' : 'Manage Invoices')}
+            {isTrashRoute && counts.trashCount > 0 && (
+              <span className="badge badge-danger" style={{ marginLeft: 12, verticalAlign: 'middle' }}>
+                {counts.trashCount} in trash
+              </span>
+            )}
+          </h1>
+        </div>
+        {!isTrashRoute && can('invoices.create', 'gst_invoices.create') && (
+          <Link className="btn btn-primary" to="/invoices/add">
+            <PlusIcon width={15} height={15} /> {gstOnly ? 'Add GST Invoice' : 'Add Invoice'}
+          </Link>
+        )}
+      </div>
+
+      {!can('invoices.view_all') && !isTrashRoute && (
+        <div className="trash-banner">
+          <AlertIcon width={17} height={17} style={{ color: 'var(--purple-600)', flexShrink: 0 }} />
+          <div>
+            <strong>Your invoices only.</strong>
+            {' '}This list shows invoices you created. Invoices created by other users are not visible to you.
+          </div>
+        </div>
+      )}
+
+      {gstOnly && !isTrashRoute && (
+        <div className="trash-banner">
+          <AlertIcon width={17} height={17} style={{ color: 'var(--purple-600)', flexShrink: 0 }} />
+          <div>
+            <strong>GST invoices only.</strong>
+            {' '}Your role can view, create, edit, delete and print invoices billed purely for the GST product. Invoices that contain any other product are not shown, here or in the trash.
+          </div>
+        </div>
+      )}
+
+      {isTrashRoute && (
+        <div className="trash-banner">
+          <AlertIcon width={17} height={17} style={{ color: 'var(--purple-600)', flexShrink: 0 }} />
+          <div>
+            <strong>Invoices in Trash are automatically deleted permanently after 10 days.</strong>
+            {' '}Click the green restore icon on any invoice to return it to active invoices.
+          </div>
+        </div>
+      )}
+
+      <div className="card">
+        <DataTable
+          columns={isTrashRoute ? trashColumns : activeColumns}
+          {...table}
+          searchPlaceholder={isTrashRoute ? 'Search trash invoices…' : 'Search invoice no, company, contact…'}
+          emptyTitle={isTrashRoute ? 'Trash is empty' : (gstOnly ? 'No GST invoices yet' : 'No invoices yet')}
+          emptyMessage={
+            isTrashRoute
+              ? 'No invoices are currently in the trash.'
+              : (gstOnly ? 'Raise your first GST invoice and it will appear here.' : 'Raise your first invoice and it will appear here.')
+          }
+        />
+      </div>
+
+      <ConfirmDialog
+        open={Boolean(toDelete)}
+        busy={deleting}
+        title={activeTab === 'trash' ? 'Permanently delete invoice?' : 'Move invoice to trash?'}
+        message={
+          activeTab === 'trash'
+            ? `Invoice #${toDelete?.invoice_no} for ${toDelete?.companyname} and all its line items will be permanently erased. This action CANNOT be undone.`
+            : `Invoice #${toDelete?.invoice_no} for ${toDelete?.companyname} will be moved to the Trash. You can restore it anytime within 10 days before it is automatically deleted.`
+        }
+        confirmText={activeTab === 'trash' ? 'Delete Permanently' : 'Move to Trash'}
+        onConfirm={handleDelete}
+        onCancel={() => setToDelete(null)}
+      />
+
+      <EmailInvoiceDialog
+        invoice={emailRow}
+        onClose={() => setEmailRow(null)}
+      />
+    </div>
+  );
+}

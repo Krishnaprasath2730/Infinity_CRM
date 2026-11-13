@@ -1,0 +1,73 @@
+import { Navigate, Route, Routes } from 'react-router-dom';
+import AppLayout from './components/layout/AppLayout';
+import { ProtectedRoute, PermissionRoute } from './components/layout/ProtectedRoute';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import AddCustomer from './pages/customers/AddCustomer';
+import ManageCustomer from './pages/customers/ManageCustomer';
+import AddProduct from './pages/products/AddProduct';
+import ManageProduct from './pages/products/ManageProduct';
+import AddInvoice from './pages/invoices/AddInvoice';
+import ManageInvoice from './pages/invoices/ManageInvoice';
+import ManageQuotation from './pages/quotations/ManageQuotation';
+import AddQuotation from './pages/quotations/AddQuotation';
+import QuotationView from './pages/quotations/QuotationView';
+import Reports from './pages/reports/Reports';
+import AddUser from './pages/users/AddUser';
+import ManageUsers from './pages/users/ManageUsers';
+import RolesPermissions from './pages/users/RolesPermissions';
+import CompanySettings from './pages/settings/CompanySettings';
+
+// Invoice screens open for the full invoices.* permission or its GST-only twin;
+// the API then limits GST-only accounts to invoices that carry the GST line item.
+const INVOICE = {
+  view: ['invoices.view', 'gst_invoices.view'],
+  create: ['invoices.create', 'gst_invoices.create'],
+  edit: ['invoices.edit', 'gst_invoices.edit'],
+  delete: ['invoices.delete', 'gst_invoices.delete'],
+};
+
+export default function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+
+      <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+        <Route path="/dashboard" element={<PermissionRoute permission="dashboard.view"><Dashboard /></PermissionRoute>} />
+
+        <Route path="/customers" element={<PermissionRoute permission="customers.view"><ManageCustomer /></PermissionRoute>} />
+        <Route path="/customers/add" element={<PermissionRoute permission="customers.create"><AddCustomer /></PermissionRoute>} />
+        <Route path="/customers/:id/edit" element={<PermissionRoute permission="customers.edit"><AddCustomer /></PermissionRoute>} />
+
+        <Route path="/products" element={<PermissionRoute permission="products.view"><ManageProduct /></PermissionRoute>} />
+        <Route path="/products/add" element={<PermissionRoute permission="products.create"><AddProduct /></PermissionRoute>} />
+        <Route path="/products/:id/edit" element={<PermissionRoute permission="products.edit"><AddProduct /></PermissionRoute>} />
+
+        <Route path="/invoices" element={<PermissionRoute permission={INVOICE.view}><ManageInvoice /></PermissionRoute>} />
+        <Route path="/invoices/trash" element={<PermissionRoute permission={INVOICE.delete}><ManageInvoice /></PermissionRoute>} />
+        <Route path="/invoices/add" element={<PermissionRoute permission={INVOICE.create}><AddInvoice /></PermissionRoute>} />
+        <Route path="/invoices/:id/edit" element={<PermissionRoute permission={INVOICE.edit}><AddInvoice /></PermissionRoute>} />
+
+        <Route path="/estimates" element={<PermissionRoute permission="quotations.view"><ManageQuotation /></PermissionRoute>} />
+        <Route path="/estimates/add" element={<PermissionRoute permission="quotations.create"><AddQuotation /></PermissionRoute>} />
+        <Route path="/estimates/:id" element={<PermissionRoute permission="quotations.view"><QuotationView /></PermissionRoute>} />
+        <Route path="/estimates/view/:id" element={<PermissionRoute permission="quotations.view"><QuotationView /></PermissionRoute>} />
+        <Route path="/estimates/:id/edit" element={<PermissionRoute permission="quotations.edit"><AddQuotation /></PermissionRoute>} />
+        <Route path="/quotations" element={<Navigate to="/estimates" replace />} />
+        <Route path="/quotation" element={<Navigate to="/estimates" replace />} />
+
+        <Route path="/reports" element={<PermissionRoute permission="reports.view"><Reports /></PermissionRoute>} />
+
+        <Route path="/users" element={<PermissionRoute permission="users.manage"><ManageUsers /></PermissionRoute>} />
+        <Route path="/users/add" element={<PermissionRoute permission="users.manage"><AddUser /></PermissionRoute>} />
+        <Route path="/roles" element={<PermissionRoute permission="roles.manage"><RolesPermissions /></PermissionRoute>} />
+
+        <Route path="/settings" element={<PermissionRoute permission="settings.manage"><CompanySettings /></PermissionRoute>} />
+
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  );
+}

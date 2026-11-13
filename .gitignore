@@ -1,0 +1,32 @@
+node_modules/
+dist/
+.env
+.env.*
+*.env
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+
+# Allow example files
+!.env.example
+!*.env.example
+!backend/.env.example
+!frontend/.env.example
+
+*.log
+*.tmp
+*.pdf
+.wrangler/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# IDE / session settings
+.claude/
+.agents/
+
+# Database CA certificates downloaded for local testing
+certs/
+*.pem
