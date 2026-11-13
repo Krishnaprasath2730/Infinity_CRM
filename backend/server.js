@@ -157,12 +157,12 @@ app.get('*', (req, res, next) => {
   });
 });
 
-const DB_DOWN_CODES = new Set(['ECONNREFUSED', 'PROTOCOL_CONNECTION_LOST', 'ER_ACCESS_DENIED_ERROR', 'ER_BAD_DB_ERROR', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENOTFOUND']);
+const DB_DOWN_CODES = new Set(['ECONNREFUSED', 'PROTOCOL_CONNECTION_LOST', 'ER_ACCESS_DENIED_ERROR', 'ER_BAD_DB_ERROR', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENOTFOUND', 'ER_DBACCESS_DENIED_ERROR']);
 
 app.use((err, _req, res, _next) => {
   // Never log err.sql: mysql2 includes the full statement with bound values.
   console.error(`[error] ${err.code || ''} ${err.message}`);
-  if (!isProduction && err.stack) console.error(err.stack);
+  if (err.stack) console.error(err.stack);
 
   if (err.code === 'ER_ROW_IS_REFERENCED_2' || err.errno === 1451) {
     return res.status(409).json({ message: 'This record is still used by existing records and cannot be deleted.' });
@@ -170,14 +170,14 @@ app.use((err, _req, res, _next) => {
   if (err.code === 'ER_DUP_ENTRY' || err.errno === 1062) {
     return res.status(409).json({ message: 'That value already exists.' });
   }
-  if (DB_DOWN_CODES.has(err.code)) {
-    return res.status(503).json({ message: 'Cannot reach the database. Check the DB_* settings and that MySQL is running.' });
+  if (DB_DOWN_CODES.has(err.code) || err.message === 'MySQL is not connected' || (err.message && err.message.toLowerCase().includes('connect'))) {
+    return res.status(503).json({ message: 'Cannot connect to database. Please check DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME in your hosting environment settings.' });
   }
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({ message: 'Invalid JSON body.' });
   }
 
-  res.status(err.status || 500).json({ message: isProduction && !err.status ? 'Internal server error' : (err.message || 'Internal server error') });
+  res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
 });
 
 const PORT = Number(process.env.PORT) || 5000;
