@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/AuthContext';
 import { useClock } from '../../hooks/useClock';
 import { BrandLockup, LogoutIcon, MenuIcon } from '../common/Icons';
+import ThemeToggle from '../common/ThemeToggle';
 
 export default function TopBar({ onToggleSidebar, showBrand }) {
   const { user, logout } = useAuth();
@@ -45,6 +46,7 @@ export default function TopBar({ onToggleSidebar, showBrand }) {
       <div className="topbar-clock">{now.toString()}</div>
 
       <div className="topbar-right" ref={menuRef}>
+        <ThemeToggle />
         <button className="avatar-btn" onClick={() => setMenuOpen((o) => !o)}>
           <span className="avatar-meta">
             <strong>{user?.name || user?.username}</strong>

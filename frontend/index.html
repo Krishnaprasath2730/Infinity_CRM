@@ -19,6 +19,18 @@
       rel="stylesheet"
     />
     <title>Infinity CRM</title>
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('infinity_theme');
+          var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (dark) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.documentElement.setAttribute('data-mui-color-scheme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
