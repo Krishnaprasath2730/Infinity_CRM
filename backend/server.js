@@ -124,11 +124,14 @@ app.get('/api/health', health);
 app.use('/api', (_req, res) => res.status(404).json({ message: 'Endpoint not found' }));
 
 // Serve the React build when it exists next to the API (single-host setups).
-// Checks frontend/dist first, falling back to client/dist.
 const fs = require('fs');
-const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
-const clientDist = path.join(__dirname, '..', 'client', 'dist');
-const clientPath = fs.existsSync(frontendDist) ? frontendDist : clientDist;
+const candidatePaths = [
+  path.join(__dirname, '..', 'frontend', 'dist'),
+  path.join(process.cwd(), 'frontend', 'dist'),
+  path.join(__dirname, '..', 'client', 'dist'),
+  path.join(process.cwd(), 'dist'),
+];
+const clientPath = candidatePaths.find((p) => fs.existsSync(p)) || candidatePaths[0];
 
 app.use('/assets', express.static(path.join(clientPath, 'assets'), {
   maxAge: '1y',

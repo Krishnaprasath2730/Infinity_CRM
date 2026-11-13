@@ -1,5 +1,10 @@
 node_modules/
+# Allow prebuilt frontend distribution for single-server production deployment
+!frontend/dist/
+!frontend/dist/**
 dist/
+!frontend/dist/
+!frontend/dist/**
 .env
 .env.*
 *.env
