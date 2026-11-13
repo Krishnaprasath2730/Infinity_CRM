@@ -142,3 +142,4 @@ export function ThemeToggle({ className = '', style = {}, ...props }) {
 }
 
 export default ThemeToggle;
+

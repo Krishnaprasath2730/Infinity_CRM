@@ -45,30 +45,32 @@ export default function TopBar({ onToggleSidebar, showBrand }) {
 
       <div className="topbar-clock">{now.toString()}</div>
 
-      <div className="topbar-right" ref={menuRef}>
+      <div className="topbar-right">
         <ThemeToggle />
-        <button className="avatar-btn" onClick={() => setMenuOpen((o) => !o)}>
-          <span className="avatar-meta">
-            <strong>{user?.name || user?.username}</strong>
-            <span>{user?.roleName}</span>
-          </span>
-          <span className="avatar">{initials}</span>
-        </button>
+        <div className="user-profile-menu" ref={menuRef}>
+          <button className="avatar-btn" onClick={() => setMenuOpen((o) => !o)} aria-label="User account menu" aria-expanded={menuOpen}>
+            <span className="avatar-meta">
+              <strong>{user?.name || user?.username}</strong>
+              <span>{user?.roleName}</span>
+            </span>
+            <span className="avatar">{initials}</span>
+          </button>
 
-        {menuOpen && (
-          <div className="user-menu">
-            <div className="user-info">
-              <span className="avatar" style={{ width: 38, height: 38, fontSize: 14 }}>{initials}</span>
-              <div style={{ minWidth: 0 }}>
-                <strong>{user?.name || user?.username}</strong>
-                <span>{user?.email || user?.roleName}</span>
+          {menuOpen && (
+            <div className="user-menu">
+              <div className="user-info">
+                <span className="avatar" style={{ width: 38, height: 38, fontSize: 14 }}>{initials}</span>
+                <div style={{ minWidth: 0 }}>
+                  <strong>{user?.name || user?.username}</strong>
+                  <span>{user?.email || user?.roleName}</span>
+                </div>
               </div>
+              <button className="menu-action" onClick={handleLogout}>
+                <LogoutIcon width={15} height={15} /> Logout
+              </button>
             </div>
-            <button className="menu-action" onClick={handleLogout}>
-              <LogoutIcon width={15} height={15} /> Logout
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </header>
   );
