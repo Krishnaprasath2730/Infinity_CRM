@@ -1,0 +1,16 @@
+# Infinity CRM - Apache / LiteSpeed Configuration
+<IfModule mod_mime.c>
+  AddType image/svg+xml .svg
+  AddType image/x-icon .ico
+  AddType image/png .png
+  AddType application/javascript .js
+  AddType text/css .css
+</IfModule>
+
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/svg+xml "access plus 1 day"
+  ExpiresByType image/x-icon "access plus 1 day"
+  ExpiresByType image/png "access plus 1 day"
+  ExpiresByType text/html "access plus 0 seconds"
+</IfModule>

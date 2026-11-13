@@ -133,6 +133,33 @@ const candidatePaths = [
 ];
 const clientPath = candidatePaths.find((p) => fs.existsSync(p)) || candidatePaths[0];
 
+// Explicit favicon & icon handler to guarantee HD favicons serve with exact MIME types
+const FAVICON_FILES = new Set([
+  'favicon.ico', 'favicon.svg', 'favicon-16.png', 'favicon-32.png',
+  'favicon-48.png', 'favicon-64.png', 'favicon-128.png', 'favicon-256.png',
+  'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'
+]);
+
+app.get('/:file', (req, res, next) => {
+  const filename = req.params.file;
+  if (!FAVICON_FILES.has(filename)) return next();
+
+  const candidates = [
+    path.join(clientPath, filename),
+    path.join(__dirname, '..', filename),
+    path.join(__dirname, '..', 'frontend', 'public', filename),
+  ];
+  const found = candidates.find((p) => fs.existsSync(p));
+  if (!found) return next();
+
+  if (filename.endsWith('.svg')) res.type('image/svg+xml');
+  else if (filename.endsWith('.ico')) res.type('image/x-icon');
+  else if (filename.endsWith('.png')) res.type('image/png');
+
+  res.setHeader('Cache-Control', 'public, max-age=86400, must-revalidate');
+  return res.sendFile(found);
+});
+
 app.use('/assets', express.static(path.join(clientPath, 'assets'), {
   maxAge: '1y',
   immutable: true,
