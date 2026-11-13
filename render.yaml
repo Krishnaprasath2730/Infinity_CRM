@@ -1,15 +1,14 @@
-# Render Blueprint for the Permit Declaration API (free instance).
+# Render Blueprint for Infinity CRM API
 # Dashboard: New -> Blueprint -> pick this repository. Values marked sync: false
 # are prompted for in the dashboard and never stored in git.
 services:
   - type: web
-    name: permit-declaration-api
+    name: infinity-crm-api
     runtime: node
     plan: free
     region: singapore
-    rootDir: server
-    buildCommand: npm ci
-    startCommand: npm start
+    buildCommand: npm install
+    startCommand: node server.js
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:

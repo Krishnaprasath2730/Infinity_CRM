@@ -116,8 +116,11 @@ app.get('/api/health', health);
 app.use('/api', (_req, res) => res.status(404).json({ message: 'Endpoint not found' }));
 
 // Serve the React build when it exists next to the API (single-host setups).
-// On Render + Cloudflare Pages the frontend is hosted separately and this is unused.
-const clientPath = path.join(__dirname, '..', 'client', 'dist');
+// Checks frontend/dist first, falling back to client/dist.
+const fs = require('fs');
+const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+const clientPath = fs.existsSync(frontendDist) ? frontendDist : clientDist;
 
 app.use('/assets', express.static(path.join(clientPath, 'assets'), {
   maxAge: '1y',

@@ -1,15 +1,34 @@
 {
-  "name": "permit-declaration",
+  "name": "infinity-crm",
   "version": "1.0.0",
   "private": true,
-  "description": "Permit Declaration - CRM, invoicing and GST billing",
+  "description": "Infinity CRM - Invoicing, quotations and GST billing",
+  "main": "server.js",
   "scripts": {
-    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
-    "dev": "concurrently -n api,web -c magenta,cyan \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
-    "start": "node server/server.js",
-    "build": "npm --prefix client install --include=dev && npm --prefix server install --omit=dev && npm --prefix client run build"
+    "start": "node server.js",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "postinstall": "npm --prefix backend install --omit=dev",
+    "dev": "concurrently -n api,web -c blue,orange \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.8.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.5.1",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.24.6",
+    "nodemailer": "^10.0.12",
+    "pdfmake": "^0.2.12"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
