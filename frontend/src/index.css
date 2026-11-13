@@ -552,9 +552,9 @@ td[style*="text-align:right"] .row-actions {
 .sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
-  background: linear-gradient(180deg, #0b1528 0%, #0e1e38 60%, #091222 100%);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  color: #e2e8f0;
+  background: #ffffff;
+  border-right: 1px solid var(--line);
+  color: var(--ink-2);
   display: flex;
   flex-direction: column;
   padding: 20px 14px 18px;
@@ -564,6 +564,7 @@ td[style*="text-align:right"] .row-actions {
   position: sticky;
   top: 0;
   height: 100vh;
+  box-shadow: 1px 0 3px rgba(0, 0, 0, 0.02);
 }
 
 .sidebar.collapsed {
@@ -571,21 +572,23 @@ td[style*="text-align:right"] .row-actions {
 }
 
 .sidebar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: transparent;
+  background: #d6d8e4;
+  border-radius: var(--r-pill);
+  border: 3px solid #ffffff;
 }
 
 .sidebar-brand {
-  color: #fff;
-  padding: 4px 10px 22px;
+  padding: 4px 8px 18px;
+  border-bottom: 1px solid var(--line-soft);
+  margin-bottom: 6px;
 }
 
 .sidebar-section-label {
-  padding: 18px 14px 8px;
+  padding: 16px 14px 6px;
   font-size: 11px;
   letter-spacing: 0.08em;
   font-weight: 700;
-  color: #64748b;
+  color: #94a3b8;
   text-transform: uppercase;
 }
 
@@ -593,29 +596,31 @@ td[style*="text-align:right"] .row-actions {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10.5px 14px;
+  padding: 10px 14px;
   font-size: 13.5px;
   font-weight: 500;
-  color: #94a3b8;
+  color: #475569;
   border-radius: var(--r-md);
   cursor: pointer;
-  transition: all 0.18s var(--ease);
+  transition: all 0.16s var(--ease);
   user-select: none;
 }
 
 .sidebar-item svg {
   flex-shrink: 0;
   opacity: 0.85;
-  color: inherit;
+  color: #64748b;
+  transition: color 0.16s var(--ease);
 }
 
 .sidebar-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
+  background: #f1f5f9;
+  color: #0f172a;
 }
 
 .sidebar-item:hover svg {
   opacity: 1;
+  color: #0070eb;
 }
 
 .sidebar-item .label {
@@ -626,7 +631,7 @@ td[style*="text-align:right"] .row-actions {
   background: linear-gradient(135deg, #0070eb 0%, #0056b3 100%);
   color: #ffffff;
   font-weight: 600;
-  box-shadow: 0 4px 14px rgba(0, 112, 235, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 112, 235, 0.32);
 }
 
 .sidebar-item.active svg {
@@ -636,7 +641,8 @@ td[style*="text-align:right"] .row-actions {
 
 .sidebar-chevron {
   transition: transform 0.22s var(--ease);
-  opacity: 0.6;
+  opacity: 0.55;
+  color: inherit;
 }
 
 .sidebar-chevron.open {
@@ -646,9 +652,9 @@ td[style*="text-align:right"] .row-actions {
 .sidebar-submenu {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 0.26s var(--ease);
+  transition: grid-template-rows 0.24s var(--ease);
   margin-left: 18px;
-  border-left: 2px solid rgba(255, 255, 255, 0.1);
+  border-left: 2px solid #e2e8f0;
   padding-left: 8px;
   margin-top: 2px;
   margin-bottom: 4px;
@@ -664,19 +670,19 @@ td[style*="text-align:right"] .row-actions {
 
 .sidebar-submenu .sidebar-item {
   font-size: 13px;
-  padding: 8.5px 12px;
+  padding: 8px 12px;
   border-radius: var(--r-sm);
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .sidebar-submenu .sidebar-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
+  background: #f8fafc;
+  color: #0070eb;
 }
 
 .sidebar-submenu .sidebar-item.active {
-  background: rgba(0, 112, 235, 0.18);
-  color: #38bdf8;
+  background: #e0efff;
+  color: #0070eb;
   font-weight: 600;
   box-shadow: none;
 }
@@ -685,8 +691,8 @@ td[style*="text-align:right"] .row-actions {
   margin-top: auto;
   padding: 16px 14px 4px;
   font-size: 11.5px;
-  color: #64748b;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  border-top: 1px solid var(--line-soft);
 }
 
 .main-area {
