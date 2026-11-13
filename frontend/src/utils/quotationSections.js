@@ -39,8 +39,8 @@ export function resolveVisibility(quotation = {}) {
 
 export function buildDefaultSections({
   currency = 'SGD',
-  companyName = 'Chola Logistics Pte Ltd',
-  email = 'accounts@permitdeclaration.com.sg',
+  companyName = 'Infinity Solutions Pte Ltd',
+  email = 'contact@infinitysolutions.com.sg',
   contact = '',
 } = {}) {
   return {

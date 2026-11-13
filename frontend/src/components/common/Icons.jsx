@@ -28,10 +28,10 @@ export function BrandLockup({ onDark = false, width, maxHeight, style = {} }) {
           maxHeight: maxHeight || 'none',
           height: maxHeight ? maxHeight : 'auto',
           display: 'block',
-          borderRadius: onDark ? '8px' : '0',
+          borderRadius: onDark ? '10px' : '0',
           background: onDark ? '#ffffff' : 'transparent',
-          padding: onDark ? '8px 12px' : '0',
-          boxShadow: onDark ? '0 2px 8px rgba(0, 0, 0, 0.12)' : 'none',
+          padding: onDark ? '8px 14px' : '0',
+          boxShadow: onDark ? '0 4px 14px rgba(0, 0, 0, 0.25)' : 'none',
         }}
       />
     </div>

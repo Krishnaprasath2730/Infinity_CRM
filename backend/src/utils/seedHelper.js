@@ -80,19 +80,20 @@ async function runMigrations(permissionIds) {
 const products = [
   'GST', 'IMPORT DECLARATION', 'EXPORT DECLARATION', 'CANCELLATION',
   'CARGO CLEARANCE AND TRANSPORTATION', 'ITEM COST',
-  'IMPORTER OF THE RECORD (USING CHOLA AS IMPORTER)', 'LICENSE (USING CHOLA LICENSE)',
+  'IMPORTER OF THE RECORD', 'LICENSE DECLARATION',
 ];
 
 const defaultSettings = {
-  company_name: 'Chola Logistics Pte Ltd',
-  address: 'Blk-640, Rowell Road, #01-54, Singapore 200640',
-  tel: '+65 62917747',
-  mobile: '+65 90144400',
-  email: 'accounts@permitdeclaration.com.sg',
-  website: 'www.permitdeclaration.com.sg',
-  contact_no: '+65 96539713',
-  uen: '201835067C',
+  company_name: 'Infinity Solutions Pte Ltd',
+  address: '10 Anson Road, #26-04 International Plaza, Singapore 079903',
+  tel: '+65 6123 4567',
+  mobile: '+65 9123 4567',
+  email: 'contact@infinitysolutions.com.sg',
+  website: 'www.infinitysolutions.com.sg',
+  contact_no: '+65 9123 4567',
+  uen: '202412345A',
   default_currency: 'SGD',
+  cheque_payable_to: 'All Cheques should be crossed and made payable to INFINITY SOLUTIONS PTE LTD',
 };
 
 async function grantAll(roleId, codes, permissionIds) {
@@ -146,10 +147,10 @@ async function seedDefaults(overrideUsername, overridePassword) {
   // Company settings: created once, then owned by the Company Settings screen.
   if (!(await queryOne('SELECT id FROM company_settings LIMIT 1'))) {
     await execute(
-      `INSERT INTO company_settings (id, company_name, address, tel, mobile, email, website, contact_no, uen, default_currency, created_at, updated_at)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO company_settings (id, company_name, address, tel, mobile, email, website, contact_no, uen, default_currency, cheque_payable_to, created_at, updated_at)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [defaultSettings.company_name, defaultSettings.address, defaultSettings.tel, defaultSettings.mobile, defaultSettings.email,
-        defaultSettings.website, defaultSettings.contact_no, defaultSettings.uen, defaultSettings.default_currency, now(), now()]
+        defaultSettings.website, defaultSettings.contact_no, defaultSettings.uen, defaultSettings.default_currency, defaultSettings.cheque_payable_to, now(), now()]
     );
   }
 

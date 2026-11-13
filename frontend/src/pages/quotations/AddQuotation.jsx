@@ -94,8 +94,8 @@ export default function AddQuotation() {
 
         const sectionOpts = {
           currency: settings.default_currency || 'SGD',
-          companyName: settings.company_name || 'Chola Logistics Pte Ltd',
-          email: settings.email || 'accounts@permitdeclaration.com.sg',
+          companyName: settings.company_name || 'Infinity Solutions Pte Ltd',
+          email: settings.email || 'contact@infinitysolutions.com.sg',
           contact: settings.mobile || settings.tel || settings.contact_no || '',
         };
         setSectionDefaults(sectionOpts);

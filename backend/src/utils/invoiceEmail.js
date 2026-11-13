@@ -88,22 +88,22 @@ function messageToHtml(text) {
  */
 function buildInvoiceEmail(invoice = {}, settings = {}, overrides = {}) {
   const period = monthYear(invoice.invoice_date);
-  const greetingName = (invoice.person_incharge && String(invoice.person_incharge).trim()) || 'Mam';
-  const uen = settings.uen || '201835067C';
+  const greetingName = (invoice.person_incharge && String(invoice.person_incharge).trim()) || 'Sir / Madam';
+  const uen = settings.uen || '202412345A';
 
   // Company-specific details — env override, else the standard company values.
-  const bankName = process.env.BANK_ACCOUNT_NAME || 'CHOLA LOGISTICS PTE. LTD.';
+  const bankName = process.env.BANK_ACCOUNT_NAME || (settings.company_name || 'INFINITY SOLUTIONS PTE LTD').toUpperCase();
   const bankNo = process.env.BANK_ACCOUNT_NO || '074-9033-177';
-  const signerName = process.env.EMAIL_SIGNER_NAME || 'Sandhiya';
-  const signerTitle = process.env.EMAIL_SIGNER_TITLE || 'Assistant Accounts Manager';
-  const companyLine = (settings.company_name || 'CHOLA PERMITS').toUpperCase();
+  const signerName = process.env.EMAIL_SIGNER_NAME || 'Accounts Manager';
+  const signerTitle = process.env.EMAIL_SIGNER_TITLE || 'Finance Department';
+  const companyLine = (settings.company_name || 'INFINITY SOLUTIONS').toUpperCase();
 
-  const address = settings.address || 'Blk 640 Rowell Rd, #01-54\nSingapore 200640';
-  const tel = settings.tel || '+65 6291 7747';
-  const hp = settings.mobile || '+65 90144400';
-  const email1 = settings.email || 'sales@permitdeclaration.com.sg';
-  const email2 = 'support@permitdeclaration.com.sg';
-  const website = settings.website || 'www.permitdeclaration.com.sg';
+  const address = settings.address || '10 Anson Road, #26-04 International Plaza\nSingapore 079903';
+  const tel = settings.tel || '+65 6123 4567';
+  const hp = settings.mobile || '+65 9123 4567';
+  const email1 = settings.email || 'accounts@infinitysolutions.com.sg';
+  const email2 = 'support@infinitysolutions.com.sg';
+  const website = settings.website || 'www.infinitysolutions.com.sg';
 
   const telHref = `tel:${tel.replace(/[^+\d]/g, '')}`;
   const hpHref = `tel:${hp.replace(/[^+\d]/g, '')}`;

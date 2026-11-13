@@ -5,18 +5,13 @@ const { resolveSections, resolveVisibility, toLines, visibleItems, visibleTotal,
 
 const FONT_DIR = path.join(__dirname, '..', 'assets', 'fonts');
 const LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo.png');
-const PAYNOW_PATH = path.join(__dirname, '..', 'assets', 'paynow.png');
 
 /* ---- Pre-compute asset buffers at module load (once, not per PDF) ---- */
 let logoBase64 = null;
-let paynowBase64 = null;
 
 try {
   if (fs.existsSync(LOGO_PATH)) {
     logoBase64 = `data:image/png;base64,${fs.readFileSync(LOGO_PATH).toString('base64')}`;
-  }
-  if (fs.existsSync(PAYNOW_PATH)) {
-    paynowBase64 = `data:image/png;base64,${fs.readFileSync(PAYNOW_PATH).toString('base64')}`;
   }
 } catch (err) {
   console.error('[pdf] Failed to read asset logos:', err.message);
@@ -143,22 +138,6 @@ function logoBlock() {
         margin: [4, 0, 0, 0],
       },
     ],
-  };
-}
-
-/* ---- PayNow Badge ---- */
-function payNowBadge() {
-  if (paynowBase64) {
-    return {
-      image: paynowBase64,
-      width: 110,
-      margin: [0, 6, 0, 2],
-    };
-  }
-  return {
-    text: 'PAYNOW',
-    style: 'payNow',
-    margin: [0, 4, 0, 2],
   };
 }
 
@@ -342,7 +321,7 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
 
   /* ---- "From" address block ---- */
   const fromLines = [
-    { text: settings.company_name || 'Chola Logistics Pte Ltd', style: 'partyName' },
+    { text: settings.company_name || 'Infinity Solutions Pte Ltd', style: 'partyName' },
   ];
   if (settings.address) {
     fromLines.push({ text: settings.address, style: 'partyLine' });
@@ -478,13 +457,18 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
           {
             width: 295,
             stack: [
-              { text: 'All Cheques should be crossed and made payable to', style: 'payLead' },
-              {
-                text: (settings.company_name || 'CHOLA LOGISTICS PTE LTD').toUpperCase(),
-                style: 'payee',
-              },
-              payNowBadge(),
-              { text: `UEN: ${uenNumber}`, style: 'uen' },
+              ...(settings.cheque_payable_to
+                ? [
+                    { text: settings.cheque_payable_to, style: 'payee' }
+                  ]
+                : [
+                    { text: 'All Cheques should be crossed and made payable to', style: 'payLead' },
+                    {
+                      text: (settings.company_name || 'INFINITY SOLUTIONS PTE LTD').toUpperCase(),
+                      style: 'payee',
+                    },
+                  ]),
+              ...(uenNumber ? [{ text: `UEN: ${uenNumber}`, style: 'uen' }] : []),
             ],
           },
           {
@@ -539,7 +523,6 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
 
       payLead: { fontSize: 8.5, color: INK },
       payee: { fontSize: 11, bold: true, color: INK, margin: [0, 3, 0, 0] },
-      payNow: { fontSize: 12, bold: true, color: PURPLE },
       uen: { fontSize: 10.5, bold: true, color: INK, margin: [0, 2, 0, 0] },
 
       totalLabel: { fontSize: 10, color: INK },
@@ -652,7 +635,6 @@ function reportPdfDefinition(rows, filters, summary) {
       th: { fontSize: 8.5, color: '#ffffff', bold: true },
       cell: { fontSize: 8.5, color: INK },
       summary: { fontSize: 9.5, bold: true, color: INK },
-      payNow: { fontSize: 12, bold: true, color: PURPLE },
       systemNotice: { fontSize: 10, bold: true, color: INK, italics: true },
     },
     defaultStyle: { fontSize: 8.5 },
@@ -664,11 +646,11 @@ function quotationPdfDefinition(quotation = {}, settings = {}) {
   const currency = settings.default_currency || 'SGD';
   const items = visibleItems(quotation.items);
   const vis = resolveVisibility(quotation);
-  const companyName = settings.company_name || 'Chola Logistics Pte Ltd';
+  const companyName = settings.company_name || 'Infinity Solutions Pte Ltd';
   const sections = resolveSections(quotation, {
     currency,
     companyName,
-    email: settings.email || 'accounts@permitdeclaration.com.sg',
+    email: settings.email || 'contact@infinitysolutions.com.sg',
     contact: settings.mobile || settings.tel || settings.contact_no || '',
   });
   // Same font sizing and row padding as the invoice for the same number of lines.
@@ -713,7 +695,7 @@ function quotationPdfDefinition(quotation = {}, settings = {}) {
   };
 
   /* ---- "From" address block (same as the invoice) ---- */
-  const fromLines = [{ text: settings.company_name || 'Chola Logistics Pte Ltd', style: 'partyName' }];
+  const fromLines = [{ text: settings.company_name || 'Infinity Solutions Pte Ltd', style: 'partyName' }];
   if (settings.address) fromLines.push({ text: settings.address, style: 'partyLine' });
   const telLine = [
     settings.tel ? `Tel: ${settings.tel}` : null,

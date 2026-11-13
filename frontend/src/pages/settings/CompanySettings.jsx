@@ -6,6 +6,7 @@ import { SpinnerIcon } from '../../components/common/Icons';
 const emptyForm = {
   company_name: '', address: '', tel: '', mobile: '', email: '',
   website: '', contact_no: '', uen: '', default_currency: 'SGD',
+  cheque_payable_to: '',
 };
 
 export default function CompanySettings() {
@@ -90,13 +91,26 @@ export default function CompanySettings() {
                 </div>
                 <div className="form-field">
                   <label htmlFor="uen">UEN</label>
-                  <input id="uen" value={form.uen || ''} onChange={set('uen')} placeholder="201835067C" />
+                  <input id="uen" value={form.uen || ''} onChange={set('uen')} placeholder="202412345A" />
                 </div>
                 <div className="form-field">
                   <label htmlFor="currency">Default Currency</label>
                   <input id="currency" value={form.default_currency || ''} onChange={set('default_currency')}
                     maxLength={6} placeholder="SGD" />
                 </div>
+              </div>
+
+              <div className="form-field" style={{ marginTop: 18 }}>
+                <label htmlFor="cheque_payable">
+                  Cheque Payable Instructions <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>(Printed on invoice bottom)</span>
+                </label>
+                <textarea
+                  id="cheque_payable"
+                  rows={2}
+                  value={form.cheque_payable_to || ''}
+                  onChange={set('cheque_payable_to')}
+                  placeholder="All Cheques should be crossed and made payable to INFINITY SOLUTIONS PTE LTD"
+                />
               </div>
 
               <div className="form-field" style={{ marginTop: 18 }}>
@@ -130,10 +144,11 @@ export default function CompanySettings() {
             {form.contact_no && <div>Contact: {form.contact_no}</div>}
 
             <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
-              <div style={{ fontSize: 11.5 }}>All Cheques should be crossed and made payable to</div>
-              <div style={{ fontWeight: 800, color: 'var(--ink)' }}>{(form.company_name || '').toUpperCase() || '—'}</div>
-              <div style={{ fontWeight: 800, color: 'var(--purple-700)', marginTop: 4 }}>PAYNOW</div>
-              <div style={{ fontWeight: 700, color: 'var(--ink)' }}>UEN: {form.uen || '—'}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 2 }}>Cheque / Payment Instructions:</div>
+              <div style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 12.5, whiteSpace: 'pre-wrap' }}>
+                {form.cheque_payable_to || `All Cheques should be crossed and made payable to ${(form.company_name || 'INFINITY SOLUTIONS PTE LTD').toUpperCase()}`}
+              </div>
+              {form.uen && <div style={{ fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>UEN: {form.uen}</div>}
             </div>
           </div>
         </div>

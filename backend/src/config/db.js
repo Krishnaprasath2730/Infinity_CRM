@@ -193,6 +193,7 @@ const SCHEMA = [
      contact_no VARCHAR(50) NULL,
      uen VARCHAR(50) NULL,
      default_currency VARCHAR(10) NOT NULL DEFAULT 'SGD',
+     cheque_payable_to TEXT NULL,
      created_at DATETIME(3) NULL,
      updated_at DATETIME(3) NULL
    ) ${TABLE_OPTIONS}`,
@@ -201,6 +202,7 @@ const SCHEMA = [
 // Columns added after the first release; applied to databases created before them.
 const COLUMN_ADDITIONS = [
   { table: 'invoices', column: 'created_by', ddl: 'ADD COLUMN created_by INT UNSIGNED NULL, ADD KEY idx_invoices_owner (created_by)' },
+  { table: 'company_settings', column: 'cheque_payable_to', ddl: 'ADD COLUMN cheque_payable_to TEXT NULL' },
 ];
 
 async function ensureColumns(p) {
