@@ -227,23 +227,35 @@ function assertSafeName(name) {
 async function ensureDatabase() {
   const { database, ...server } = config();
   assertSafeName(database);
-  const conn = await mysql.createConnection({ ...server, charset: 'utf8mb4' });
+  let conn;
   try {
+    conn = await mysql.createConnection({ ...server, charset: 'utf8mb4' });
     await conn.query(`CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
   } catch (err) {
-    if (err.code === 'ER_DBACCESS_DENIED_ERROR' || err.code === 'ER_ACCESS_DENIED_ERROR' || err.errno === 1044) {
+    if (
+      err.code === 'ER_DBACCESS_DENIED_ERROR' ||
+      err.code === 'ER_ACCESS_DENIED_ERROR' ||
+      err.errno === 1044 ||
+      err.errno === 1045
+    ) {
       console.warn(`[db] no permission to create database "${database}" - assuming it already exists`);
     } else {
       throw err;
     }
   } finally {
-    await conn.end();
+    if (conn) {
+      try { await conn.end(); } catch { /* ignore */ }
+    }
   }
 }
 
 async function connect() {
   if (pool) return pool;
-  await ensureDatabase();
+  try {
+    await ensureDatabase();
+  } catch (err) {
+    console.warn(`[db] ensureDatabase notice: ${err.message}`);
+  }
   pool = mysql.createPool({
     ...config(),
     waitForConnections: true,
