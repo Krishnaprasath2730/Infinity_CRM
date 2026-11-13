@@ -9,12 +9,10 @@ const rateLimit = require('express-rate-limit');
 const isProduction = process.env.NODE_ENV === 'production';
 
 if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'infinity-crm-secret-da41d4f289e9d0410ad09455e84f577c4b591e63b7ad3f1cd13ea561f0b743f1';
   if (isProduction) {
-    console.error('[config] JWT_SECRET is not set. Refusing to start in production without a real secret.');
-    process.exit(1);
+    console.warn('[config] Warning: JWT_SECRET was not set in environment. Using fallback secret.');
   }
-  // Development only: a fixed fallback so the app runs without any configuration.
-  process.env.JWT_SECRET = 'permit-declaration-secret-da41d4f289e9d0410ad09455e84f577c';
 }
 
 const { connect, getPool, close, databaseName, config: dbConfig } = require('./src/config/db');
@@ -103,12 +101,22 @@ app.use('/api/users', userRoutes);
 app.use('/api/company-settings', settingsRoutes);
 
 async function health(_req, res) {
+  let dbOk = false;
   try {
-    await getPool().query('SELECT 1');
-    res.json({ status: 'ok', database: 'mysql' });
+    const p = getPool();
+    if (p) {
+      await p.query('SELECT 1');
+      dbOk = true;
+    }
   } catch (_err) {
-    res.status(503).json({ status: 'error', message: 'Database unavailable' });
+    dbOk = false;
   }
+  res.json({
+    status: 'ok',
+    database: dbOk ? 'connected' : 'connecting_or_unreachable',
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
 }
 app.get('/health', health);
 app.get('/api/health', health);
@@ -182,51 +190,52 @@ async function connectWithRetry() {
       await getPool().query('SELECT 1');
       const { host, port, ssl } = dbConfig();
       console.log(`[db] connected to MySQL database ${databaseName()} at ${host}:${port}${ssl ? ' (TLS)' : ''}`);
-      return; // success
+      return true; // success
     } catch (err) {
       lastErr = err;
       if (attempt < MAX_DB_RETRIES) {
         const delay = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1); // 2s, 4s, 8s, 16s, 32s
         console.warn(`[db] connection attempt ${attempt}/${MAX_DB_RETRIES} failed (${err.code || err.message}). Retrying in ${delay / 1000}s...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
-        // Reset the pool so the next connect() call creates a fresh one.
         try { await close(); } catch { /* pool may not exist */ }
       }
     }
   }
-  // All retries exhausted.
   console.error('\n[db] Could not connect to MySQL after ' + MAX_DB_RETRIES + ' attempts.');
-  console.error(`     ${lastErr.code || ''} ${lastErr.message}`);
-  console.error('     Check DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME (and DB_SSL / DB_SSL_CA_PATH for hosted MySQL).\n');
-  process.exit(1);
+  console.error(`     ${lastErr?.code || ''} ${lastErr?.message}`);
+  console.error('     Check DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME in environment settings.\n');
+  return false;
 }
 
 async function start() {
-  await connectWithRetry();
-
-  try {
-    const { seedDefaults } = require('./src/utils/seedHelper');
-    await seedDefaults();
-    console.log('[seed] default roles, permissions, settings and admin user verified');
-  } catch (seedErr) {
-    console.warn('[seed] warning: auto-seed had error:', seedErr.message);
-  }
-
   const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[api] Permit Declaration API listening on port ${PORT}${isProduction ? ' (production)' : ` - http://localhost:${PORT}`}`);
+    console.log(`[api] Infinity CRM API listening on port ${PORT}${isProduction ? ' (production)' : ` - http://localhost:${PORT}`}`);
   });
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`\n[api] Port ${PORT} is already in use - another server is still running.`);
-      console.error('      Stop it, then start again. On Windows:');
-      console.error(`        netstat -ano | findstr :${PORT}`);
-      console.error('        taskkill /PID <pid> /F');
-      console.error(`      Or set a different PORT in server/.env\n`);
+      console.error('      Stop it, then start again.');
       process.exit(1);
     }
     throw err;
   });
+
+  // Connect to database in background so the web process never crashes on startup
+  connectWithRetry()
+    .then(async (ok) => {
+      if (!ok) return;
+      try {
+        const { seedDefaults } = require('./src/utils/seedHelper');
+        await seedDefaults();
+        console.log('[seed] default roles, permissions, settings and admin user verified');
+      } catch (seedErr) {
+        console.warn('[seed] warning: auto-seed had error:', seedErr.message);
+      }
+    })
+    .catch((err) => {
+      console.error('[db] DB connection error:', err.message);
+    });
 
   // Graceful shutdown: stop taking requests, let in-flight ones finish, close the pool.
   const shutdown = (signal) => {

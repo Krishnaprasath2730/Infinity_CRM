@@ -1,16 +1,28 @@
 const path = require('path');
 const fs = require('fs');
 
-// Ensure environment variables are loaded from root .env or backend/.env
-const rootEnv = path.join(__dirname, '.env');
-const backendEnv = path.join(__dirname, 'backend', '.env');
-if (fs.existsSync(rootEnv)) {
-  require('dotenv').config({ path: rootEnv });
-} else if (fs.existsSync(backendEnv)) {
-  require('dotenv').config({ path: backendEnv });
-} else {
-  require('dotenv').config();
+// Add backend/node_modules to module resolution paths so dependencies are resolved
+// whether npm install ran in root or in backend/
+const backendNodeModules = path.join(__dirname, 'backend', 'node_modules');
+if (fs.existsSync(backendNodeModules) && !module.paths.includes(backendNodeModules)) {
+  module.paths.unshift(backendNodeModules);
 }
 
-// Delegate to the backend server
+// Load environment variables from root .env or backend/.env
+const rootEnv = path.join(__dirname, '.env');
+const backendEnv = path.join(__dirname, 'backend', '.env');
+try {
+  const dotenv = require('dotenv');
+  if (fs.existsSync(rootEnv)) {
+    dotenv.config({ path: rootEnv });
+  } else if (fs.existsSync(backendEnv)) {
+    dotenv.config({ path: backendEnv });
+  } else {
+    dotenv.config();
+  }
+} catch {
+  // If dotenv is not installed yet, continue
+}
+
+// Delegate to the main Express server
 require('./backend/server.js');
