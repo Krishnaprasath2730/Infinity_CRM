@@ -1688,42 +1688,91 @@ table.datatable td .cell-strong {
 }
 
 .add-row-btn:hover {
-  background: #f6e8f8;
+  background: var(--purple-100);
   border-style: solid;
 }
 
 .totals-panel {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 18px;
-  background: linear-gradient(135deg, #f8fbff, #fcf5fd);
-  border: 1.5px solid rgba(0, 112, 235, 0.35);
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  align-items: stretch;
+  background: var(--purple-50);
+  border: 1.5px solid rgba(0, 112, 235, 0.28);
   border-radius: var(--r-lg);
-  padding: 22px;
+  padding: 18px 22px;
   margin-top: 22px;
+  transition: background 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.totals-panel .form-field {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.totals-panel .form-field label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  display: block;
+  min-height: 18px;
+  line-height: 18px;
+}
+
+.totals-panel .form-field input {
+  height: 48px;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: var(--r-md);
+  padding: 0 16px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.totals-panel .form-field input[readonly] {
+  background: var(--surface);
+  border: 1.5px solid rgba(0, 112, 235, 0.25);
+  color: var(--brand-blue);
+  cursor: default;
 }
 
 .totals-highlight {
+  height: 48px;
+  box-sizing: border-box;
   background: linear-gradient(135deg, #0070eb, #0056b3);
-  color: #fff;
+  color: #ffffff;
   border-radius: var(--r-md);
-  padding: 14px 18px;
+  padding: 0 18px;
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  box-shadow: 0 10px 24px rgba(0, 112, 235, 0.28);
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 6px 18px rgba(0, 112, 235, 0.28);
+  flex: 1;
+}
+
+.totals-panel > .totals-highlight {
+  align-self: flex-end;
+  height: 48px;
 }
 
 .totals-highlight span {
   font-size: 11.5px;
-  opacity: 0.88;
-  font-weight: 500;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .totals-highlight strong {
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  line-height: 1;
 }
 
 /* ---------------------------------------------------------------
@@ -2927,4 +2976,53 @@ table.datatable td .cell-strong {
   background: rgba(0, 112, 235, 0.12);
   border-color: rgba(0, 112, 235, 0.35);
   color: #60a5fa;
+}
+
+[data-theme="dark"] .add-row-btn:hover,
+[data-mui-color-scheme="dark"] .add-row-btn:hover {
+  background: rgba(0, 112, 235, 0.22);
+}
+
+[data-theme="dark"] .totals-panel,
+[data-mui-color-scheme="dark"] .totals-panel {
+  background: #0d1527;
+  border-color: rgba(0, 112, 235, 0.35);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .totals-panel .form-field label,
+[data-mui-color-scheme="dark"] .totals-panel .form-field label {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .totals-panel .form-field input,
+[data-mui-color-scheme="dark"] .totals-panel .form-field input {
+  background: #070d1a;
+  border-color: rgba(0, 112, 235, 0.35);
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .totals-panel .form-field input:focus,
+[data-mui-color-scheme="dark"] .totals-panel .form-field input:focus {
+  border-color: #3b82f6;
+  background: #091224;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="dark"] .totals-panel .form-field input::placeholder,
+[data-mui-color-scheme="dark"] .totals-panel .form-field input::placeholder {
+  color: #64748b;
+}
+
+[data-theme="dark"] .totals-panel .form-field input[readonly],
+[data-mui-color-scheme="dark"] .totals-panel .form-field input[readonly] {
+  background: rgba(0, 112, 235, 0.15);
+  border-color: rgba(0, 112, 235, 0.4);
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .totals-highlight,
+[data-mui-color-scheme="dark"] .totals-highlight {
+  background: linear-gradient(135deg, #0070eb, #0056b3);
+  box-shadow: 0 8px 24px rgba(0, 112, 235, 0.45);
 }

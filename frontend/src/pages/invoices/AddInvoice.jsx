@@ -410,13 +410,24 @@ export default function AddInvoice() {
               <input readOnly className="num" value={subAmount.toFixed(2)} />
             </div>
             <div className="form-field">
-              <label htmlFor="paid">Paid Amount</label>
-              <input id="paid" type="number" step="0.01" min="0" inputMode="decimal" value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)} placeholder="0.00" />
+              <label htmlFor="paid">Paid Amount ({currency})</label>
+              <input
+                id="paid"
+                type="number"
+                step="0.01"
+                min="0"
+                inputMode="decimal"
+                value={paidAmount}
+                onChange={(e) => setPaidAmount(e.target.value)}
+                placeholder="0.00"
+              />
             </div>
-            <div className="totals-highlight">
-              <span>Due Amount</span>
-              <strong className="num">{currency} {dueAmount.toFixed(2)}</strong>
+            <div className="form-field totals-highlight-field">
+              <label>Due Amount ({currency})</label>
+              <div className="totals-highlight">
+                <span>Due Balance</span>
+                <strong className="num">{currency} {dueAmount.toFixed(2)}</strong>
+              </div>
             </div>
           </div>
 
