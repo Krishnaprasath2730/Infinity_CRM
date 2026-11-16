@@ -624,8 +624,10 @@ async function buildInvoiceExcel(invoice = {}, items = [], settings = {}) {
   sheet.addRow([]).height = 12;
   const totalRow = sheet.addRow([]);
   totalRow.height = 24;
-  const totalLabel = totalRow.getCell(5);
-  totalLabel.value = 'Total';
+  // Starts in the Qty column, like the PDF.
+  sheet.mergeCells(totalRow.number, 4, totalRow.number, 5);
+  const totalLabel = totalRow.getCell(4);
+  totalLabel.value = `Total in ${currency}`;
   totalLabel.font = quoteFont({ size: 11 });
   totalLabel.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
   const totalValue = totalRow.getCell(6);
@@ -633,7 +635,7 @@ async function buildInvoiceExcel(invoice = {}, items = [], settings = {}) {
   totalValue.numFmt = '0.00';
   totalValue.font = quoteFont({ size: 11, bold: true });
   totalValue.alignment = { vertical: 'middle', horizontal: 'right' };
-  [totalLabel, totalValue].forEach((cell) => { cell.border = { top: thin(PURPLE), bottom: thin(PURPLE) }; });
+  [4, 5, 6].forEach((col) => { totalRow.getCell(col).border = { top: thin(PURPLE), bottom: thin(PURPLE) }; });
 
   /* ---- Payment details (same reading of the text as the PDF) ---- */
   const fullRow = (text, font = {}) => {

@@ -308,6 +308,16 @@ const HEADER_RIGHT_WIDTH = 185;
 // payment details start this far down so their top is level with the rule under the Total.
 const TOTAL_BOX_HEIGHT = 30;
 
+// Invoice line-items table: fixed column widths and the padding on each side of a cell.
+const ITEM_CELL_PADDING = 6;
+const QTY_COL_WIDTH = 40;
+const UNIT_COST_COL_WIDTH = 58;
+const LINE_TOTAL_COL_WIDTH = 60;
+// The Total box spans the Qty, Unit Cost and Total columns, so its rule starts at the Qty column.
+const TOTAL_BOX_WIDTH = QTY_COL_WIDTH + UNIT_COST_COL_WIDTH + LINE_TOTAL_COL_WIDTH + ITEM_CELL_PADDING * 6;
+// Width of the heading "Qty" in Lato Bold, as a multiple of the font size.
+const QTY_HEADING_EM = 1.7065;
+
 /** Blue label with a white caption, as wide as its text; a block heading on the invoice. */
 function sectionBar(text, margin = [0, 0, 0, 0]) {
   return {
@@ -452,6 +462,9 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
   const currency = settings.default_currency || 'SGD';
   const sp = getSpacing(items);
 
+  // Distance from the left edge of the Qty column to the start of its centred heading.
+  const qtyHeadingInset = ITEM_CELL_PADDING + (QTY_COL_WIDTH - QTY_HEADING_EM * sp.thFontSize) / 2;
+
   /* ---- Build item rows ---- */
   const itemRows = items.map((item, idx) => [
     { text: String(idx + 1), style: 'cell', alignment: 'center' },
@@ -494,7 +507,7 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
         table: {
           headerRows: 1,
           dontBreakRows: true,
-          widths: [20, 112, '*', 40, 58, 60],
+          widths: [20, 112, '*', QTY_COL_WIDTH, UNIT_COST_COL_WIDTH, LINE_TOTAL_COL_WIDTH],
           body: [
             [
               { text: '#', style: 'th', color: '#ffffff', bold: true, alignment: 'center' },
@@ -517,8 +530,8 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
           hLineColor: () => PURPLE,
           paddingTop: (i) => (i === 0 ? 7 : sp.tablePaddingV),
           paddingBottom: (i) => (i === 0 ? 7 : sp.tablePaddingV),
-          paddingLeft: (i) => (i === 0 ? 4 : 6),
-          paddingRight: (i) => (i === 5 ? 6 : 6),
+          paddingLeft: (i) => (i === 0 ? 4 : ITEM_CELL_PADDING),
+          paddingRight: () => ITEM_CELL_PADDING,
         },
       },
 
@@ -528,17 +541,17 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
         unbreakable: true,
         columns: [
           {
-            width: 295,
+            width: '*',
             stack: paymentDetailsBlock(settings),
             margin: [0, TOTAL_BOX_HEIGHT, 0, 0],
           },
           {
-            width: 220,
+            width: TOTAL_BOX_WIDTH,
             table: {
               widths: ['*', 'auto'],
               body: [
                 [
-                  { text: 'Total', style: 'totalLabel', border: [false, true, false, true] },
+                  { text: `Total in ${currency}`, style: 'totalLabel', border: [false, true, false, true] },
                   { text: money(invoice.sub_amount), style: 'totalValue', alignment: 'right', border: [false, true, false, true] },
                 ],
               ],
@@ -549,8 +562,9 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
               hLineColor: () => PURPLE,
               paddingTop: () => 8,
               paddingBottom: () => 8,
-              paddingLeft: () => 8,
-              paddingRight: () => 6,
+              // The label starts exactly where the centred "Qty" heading starts.
+              paddingLeft: (i) => (i === 0 ? qtyHeadingInset : 8),
+              paddingRight: () => ITEM_CELL_PADDING,
             },
           },
         ],
