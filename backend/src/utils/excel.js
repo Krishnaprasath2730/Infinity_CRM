@@ -487,7 +487,6 @@ async function buildQuotationExcel(quotation = {}, settings = {}) {
 // A: #, B: product name, C: description, D: qty, E: unit cost, F: total.
 const INVOICE_WIDTHS = [6, 30, 40, 10, 16, 16];
 const INVOICE_COLS = INVOICE_WIDTHS.length;
-const HEADER_TINT = 'FFD6E6FB'; // light blue behind the Invoice No / DATE labels
 
 /**
  * @param {object} invoice   invoice with its customer fields (see getInvoiceWithItems)
@@ -566,13 +565,13 @@ async function buildInvoiceExcel(invoice = {}, items = [], settings = {}) {
   title.alignment = { vertical: 'middle', horizontal: 'right' };
   sheet.getRow(1).height = 28;
 
-  const metaBorder = { top: thin(INK), bottom: thin(INK), left: thin(INK), right: thin(INK) };
+  const metaBorder = { top: thin(PURPLE), bottom: thin(PURPLE), left: thin(PURPLE), right: thin(PURPLE) };
   [['Invoice No', String(invoice.invoice_no || '').replace(/^#/, '')], ['DATE', quoteDate(invoice.invoice_date)]]
     .forEach(([label, value], index) => {
       const head = sheet.getCell(2, 5 + index);
       head.value = label;
-      head.font = quoteFont({ size: 9, bold: true });
-      head.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_TINT } };
+      head.font = quoteFont({ size: 9, bold: true, color: { argb: 'FFFFFFFF' } });
+      head.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PURPLE } };
       head.alignment = { vertical: 'middle', horizontal: 'center' };
       head.border = metaBorder;
       const body = sheet.getCell(3, 5 + index);

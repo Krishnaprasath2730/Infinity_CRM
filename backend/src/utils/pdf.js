@@ -40,7 +40,6 @@ const printer = new PdfPrinter(fonts);
 const PURPLE = '#0070eb';
 const INK = '#343a40';
 const MUTED = '#717684';
-const HEADER_TINT = '#d6e6fb'; // light blue behind the Invoice # / DATE labels
 
 function money(value) {
   return Number(value || 0).toFixed(2);
@@ -398,7 +397,7 @@ function invoiceHeaderBlock(invoice, settings, sp) {
   if (customerPhone) customerLines.push(line(`Tel: ${customerPhone}`));
   if (invoice.customer_email) customerLines.push(line(`Mail: ${invoice.customer_email}`));
 
-  const metaHead = (text) => ({ text, style: 'metaHead', alignment: 'center', fillColor: HEADER_TINT });
+  const metaHead = (text) => ({ text, style: 'metaHead', alignment: 'center', fillColor: PURPLE });
   const metaValue = (text) => ({ text, style: 'metaValue', alignment: 'center' });
 
   return {
@@ -428,8 +427,9 @@ function invoiceHeaderBlock(invoice, settings, sp) {
             layout: {
               hLineWidth: () => 0.75,
               vLineWidth: () => 0.75,
-              hLineColor: () => INK,
-              vLineColor: () => INK,
+              hLineColor: () => PURPLE,
+              // White divider between the two blue heading cells, blue everywhere else.
+              vLineColor: (i, node, rowIndex) => (i === 1 && rowIndex === 0 ? '#ffffff' : PURPLE),
               paddingTop: () => 3,
               paddingBottom: () => 3,
               paddingLeft: () => 4,
@@ -562,9 +562,10 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
     styles: {
       wordmark: { fontSize: 15.5, bold: true, color: PURPLE, lineHeight: 1 },
 
-      companyName: { fontSize: 13, bold: true, color: INK, margin: [0, 2, 0, 6] },
+      // Two blank lines above the company name, so it starts below the INVOICE title.
+      companyName: { fontSize: 13, bold: true, color: INK, margin: [0, 26, 0, 6] },
       docHeading: { fontSize: 22, color: INK, margin: [0, 0, 0, 4] },
-      metaHead: { fontSize: 8, bold: true, color: INK },
+      metaHead: { fontSize: 8, bold: true, color: '#ffffff' },
       metaValue: { fontSize: 9, color: INK },
       sectionBar: { fontSize: 8, bold: true, color: '#ffffff' },
       partyName: {
