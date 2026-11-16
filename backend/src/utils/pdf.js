@@ -427,7 +427,7 @@ function invoiceHeaderBlock(invoice, settings, sp) {
             table: {
               widths: ['*', '*'],
               body: [
-                [metaHead('Invoice #'), metaHead('DATE')],
+                [metaHead('Invoice No'), metaHead('DATE')],
                 [metaValue(invoiceNo), metaValue(formatDate(invoice.invoice_date))],
               ],
             },
@@ -504,7 +504,7 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
           body: [
             [
               { text: '#', style: 'th', color: '#ffffff', bold: true, alignment: 'center' },
-              { text: 'product name', style: 'th', color: '#ffffff', bold: true, alignment: 'left' },
+              { text: 'Product Name', style: 'th', color: '#ffffff', bold: true, alignment: 'left' },
               { text: 'Description', style: 'th', color: '#ffffff', bold: true, alignment: 'left' },
               { text: 'Qty', style: 'th', color: '#ffffff', bold: true, alignment: 'center' },
               { text: `Unit Cost ${currency}`, style: 'th', color: '#ffffff', bold: true, alignment: 'left' },
