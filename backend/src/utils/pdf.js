@@ -332,8 +332,8 @@ function invoiceHeaderBlock(invoice, settings, sp) {
       {
         width: '*',
         stack: [
-          { text: settings.company_name || 'Infinity Solutions Pte Ltd', style: 'companyName' },
           { text: 'From:', style: 'partyLabel' },
+          { text: settings.company_name || 'Infinity Solutions Pte Ltd', style: 'companyName' },
           ...companyLines,
           {
             table: {
