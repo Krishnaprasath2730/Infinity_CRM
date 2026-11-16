@@ -333,6 +333,7 @@ function invoiceHeaderBlock(invoice, settings, sp) {
         width: '*',
         stack: [
           { text: settings.company_name || 'Infinity Solutions Pte Ltd', style: 'companyName' },
+          { text: 'From:', style: 'partyLabel' },
           ...companyLines,
           {
             table: {
@@ -383,14 +384,13 @@ function invoiceHeaderBlock(invoice, settings, sp) {
       },
     ],
     columnGap: 20,
-    margin: [0, 0, 0, sp.fromToBottomMargin + 4],
+    margin: [0, 0, 0, Math.max(4, sp.fromToBottomMargin - 8)],
   };
 }
 
 /* ---- Invoice PDF definition ---- */
 function invoicePdfDefinition(invoice, items = [], settings = {}) {
   const currency = settings.default_currency || 'SGD';
-  const uenNumber = settings.uen || '201835067C';
   const sp = getSpacing(items);
 
   /* ---- Build item rows ---- */
@@ -480,7 +480,6 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
                       style: 'payee',
                     },
                   ]),
-              ...(uenNumber ? [{ text: `UEN: ${uenNumber}`, style: 'uen' }] : []),
             ],
           },
           {
@@ -518,7 +517,8 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
     styles: {
       wordmark: { fontSize: 15.5, bold: true, color: PURPLE, lineHeight: 1 },
 
-      companyName: { fontSize: 13, bold: true, color: INK, margin: [0, 2, 0, 9] },
+      partyLabel: { fontSize: sp.fromFontSize, color: INK, lineHeight: 1.35 },
+      companyName: { fontSize: 13, bold: true, color: INK, margin: [0, 2, 0, 6] },
       docHeading: { fontSize: 22, color: INK, margin: [0, 0, 0, 4] },
       metaHead: { fontSize: 8, bold: true, color: INK },
       metaValue: { fontSize: 9, color: INK },
@@ -537,7 +537,6 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
 
       payLead: { fontSize: 8.5, color: INK },
       payee: { fontSize: 11, bold: true, color: INK, margin: [0, 3, 0, 0] },
-      uen: { fontSize: 10.5, bold: true, color: INK, margin: [0, 2, 0, 0] },
 
       totalLabel: { fontSize: 10, color: INK },
       totalValue: { fontSize: 10.5, bold: true, color: INK },
