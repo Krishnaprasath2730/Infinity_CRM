@@ -3,6 +3,7 @@ const path = require('path');
 const PdfPrinter = require('pdfmake');
 const { resolveSections, resolveVisibility, toLines, visibleItems, visibleTotal, lineTotal } = require('./quotationSections');
 const { parseDetailLine } = require('./paymentDetails');
+const { currencySymbol } = require('./currency');
 
 const FONT_DIR = path.join(__dirname, '..', 'assets', 'fonts');
 const LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo.png');
@@ -313,10 +314,20 @@ const ITEM_CELL_PADDING = 6;
 const QTY_COL_WIDTH = 40;
 const UNIT_COST_COL_WIDTH = 58;
 const LINE_TOTAL_COL_WIDTH = 60;
-// The Total box spans the Qty, Unit Cost and Total columns, so its rule starts at the Qty column.
-const TOTAL_BOX_WIDTH = QTY_COL_WIDTH + UNIT_COST_COL_WIDTH + LINE_TOTAL_COL_WIDTH + ITEM_CELL_PADDING * 6;
-// Width of the heading "Qty" in Lato Bold, as a multiple of the font size.
-const QTY_HEADING_EM = 1.7065;
+// The Total box sits under the Unit Cost and Total columns with the same cell padding,
+// so its label starts level with the "Unit Cost" heading.
+const TOTAL_BOX_WIDTH = UNIT_COST_COL_WIDTH + LINE_TOTAL_COL_WIDTH + ITEM_CELL_PADDING * 4;
+const TOTAL_GAP = 4; // space between the "Total Amount" label and the currency symbol
+const TOTAL_SYMBOL_GAP = 3; // least space between the currency symbol and the amount
+const TOTAL_VALUE_SIZE = 10.5;
+// Width left for the symbol and the amount together: the box less its outer padding,
+// the two gaps and the label ("Total Amount" in 10pt Lato Bold is 60pt wide).
+const TOTAL_VALUE_ROOM = TOTAL_BOX_WIDTH - ITEM_CELL_PADDING * 2 - TOTAL_GAP - TOTAL_SYMBOL_GAP - 60;
+
+/** Rough width of text such as "S$" or "12297.00" in Lato Bold, in ems (slightly generous). */
+function estimateEms(text) {
+  return [...String(text)].reduce((sum, ch) => sum + (ch === '.' || ch === ' ' || ch === ',' ? 0.26 : 0.6), 0);
+}
 
 /** Blue label with a white caption, as wide as its text; a block heading on the invoice. */
 function sectionBar(text, margin = [0, 0, 0, 0]) {
@@ -462,8 +473,14 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
   const currency = settings.default_currency || 'SGD';
   const sp = getSpacing(items);
 
-  // Distance from the left edge of the Qty column to the start of its centred heading.
-  const qtyHeadingInset = ITEM_CELL_PADDING + (QTY_COL_WIDTH - QTY_HEADING_EM * sp.thFontSize) / 2;
+  // Total: the currency symbol sits right after the label and the amount is right-aligned.
+  // A very large amount is set in a smaller size so it still fits on one line.
+  const totalSymbol = currencySymbol(currency);
+  const totalText = money(invoice.sub_amount);
+  const totalFontSize = Math.max(
+    6.5,
+    Math.min(TOTAL_VALUE_SIZE, TOTAL_VALUE_ROOM / (estimateEms(totalSymbol) + estimateEms(totalText)))
+  );
 
   /* ---- Build item rows ---- */
   const itemRows = items.map((item, idx) => [
@@ -548,11 +565,26 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
           {
             width: TOTAL_BOX_WIDTH,
             table: {
-              widths: ['*', 'auto'],
+              // Label and symbol keep their own width; the amount takes the rest, on one line.
+              widths: ['auto', 'auto', '*'],
               body: [
                 [
-                  { text: `Total in ${currency}`, style: 'totalLabel', border: [false, true, false, true] },
-                  { text: money(invoice.sub_amount), style: 'totalValue', alignment: 'right', border: [false, true, false, true] },
+                  { text: 'Total Amount', style: 'totalLabel', noWrap: true, border: [false, true, false, true] },
+                  {
+                    text: totalSymbol,
+                    style: 'totalValue',
+                    fontSize: totalFontSize,
+                    noWrap: true,
+                    border: [false, true, false, true],
+                  },
+                  {
+                    text: totalText,
+                    style: 'totalValue',
+                    fontSize: totalFontSize,
+                    noWrap: true,
+                    alignment: 'right',
+                    border: [false, true, false, true],
+                  },
                 ],
               ],
             },
@@ -562,9 +594,9 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
               hLineColor: () => PURPLE,
               paddingTop: () => 8,
               paddingBottom: () => 8,
-              // The label starts exactly where the centred "Qty" heading starts.
-              paddingLeft: (i) => (i === 0 ? qtyHeadingInset : 8),
-              paddingRight: () => ITEM_CELL_PADDING,
+              // Padding only on the outer edges, plus small gaps between the three parts.
+              paddingLeft: (i) => [ITEM_CELL_PADDING, TOTAL_GAP, TOTAL_SYMBOL_GAP][i],
+              paddingRight: (i) => (i === 2 ? ITEM_CELL_PADDING : 0),
             },
           },
         ],
@@ -599,7 +631,7 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
       payLabel: { fontSize: 8.5, color: INK },
       payValue: { fontSize: 8.5, bold: true, color: INK },
 
-      totalLabel: { fontSize: 10, color: INK },
+      totalLabel: { fontSize: 10, bold: true, color: INK },
       totalValue: { fontSize: 10.5, bold: true, color: INK },
       systemNotice: { fontSize: 10, bold: true, color: INK, italics: true },
     },

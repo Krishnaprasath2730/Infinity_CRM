@@ -4,6 +4,7 @@ const ExcelJS = require('exceljs');
 const { reportHeader } = require('./reportMeta');
 const { resolveSections, resolveVisibility, toLines: sectionLines, visibleItems } = require('./quotationSections');
 const { parseDetailLine } = require('./paymentDetails');
+const { currencySymbol } = require('./currency');
 
 const LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo.png');
 const PURPLE = 'FF0070EB';
@@ -624,18 +625,19 @@ async function buildInvoiceExcel(invoice = {}, items = [], settings = {}) {
   sheet.addRow([]).height = 12;
   const totalRow = sheet.addRow([]);
   totalRow.height = 24;
-  // Starts in the Qty column, like the PDF.
-  sheet.mergeCells(totalRow.number, 4, totalRow.number, 5);
-  const totalLabel = totalRow.getCell(4);
-  totalLabel.value = `Total in ${currency}`;
-  totalLabel.font = quoteFont({ size: 11 });
-  totalLabel.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  // Starts in the Unit Cost column, like the PDF.
+  const totalLabel = totalRow.getCell(5);
+  totalLabel.value = 'Total Amount';
+  totalLabel.font = quoteFont({ size: 11, bold: true });
+  totalLabel.alignment = { vertical: 'middle', horizontal: 'left' };
   const totalValue = totalRow.getCell(6);
   totalValue.value = Number(invoice.sub_amount) || 0;
-  totalValue.numFmt = '0.00';
+  // Stays a number. The format puts the currency symbol at the left of the cell and the
+  // amount at the right ("* " fills the space between); quotes are doubled for Excel.
+  totalValue.numFmt = `"${currencySymbol(currency).replace(/"/g, '""')}"* 0.00`;
   totalValue.font = quoteFont({ size: 11, bold: true });
   totalValue.alignment = { vertical: 'middle', horizontal: 'right' };
-  [4, 5, 6].forEach((col) => { totalRow.getCell(col).border = { top: thin(PURPLE), bottom: thin(PURPLE) }; });
+  [5, 6].forEach((col) => { totalRow.getCell(col).border = { top: thin(PURPLE), bottom: thin(PURPLE) }; });
 
   /* ---- Payment details (same reading of the text as the PDF) ---- */
   const fullRow = (text, font = {}) => {
