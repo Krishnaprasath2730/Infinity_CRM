@@ -304,6 +304,9 @@ function getSpacing(items) {
  * logo under it.
  */
 const HEADER_RIGHT_WIDTH = 185;
+// Height of the Total box (rule, 8pt padding, one 10.5pt line, 8pt padding): the
+// payment details start this far down so their top is level with the rule under the Total.
+const TOTAL_BOX_HEIGHT = 30;
 
 /** Short blue bar with a white caption, used as a block heading on the invoice. */
 function sectionBar(text, margin = [0, 0, 0, 0]) {
@@ -461,8 +464,8 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
     { text: String(idx + 1), style: 'cell', alignment: 'center' },
     { text: formatCellText(item.productname || '').toUpperCase(), style: 'cell', alignment: 'left' },
     { text: formatCellText(item.description || ''), style: 'cell', alignment: 'left' },
-    { text: money(item.rate), style: 'cell', alignment: 'left' },
     { text: String(Number(item.quantity || 0)), style: 'cell', alignment: 'center' },
+    { text: money(item.rate), style: 'cell', alignment: 'left' },
     { text: money(item.total), style: 'cell', alignment: 'right' },
   ]);
 
@@ -498,14 +501,14 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
         table: {
           headerRows: 1,
           dontBreakRows: true,
-          widths: [20, 112, '*', 58, 28, 60],
+          widths: [20, 112, '*', 40, 58, 60],
           body: [
             [
               { text: '#', style: 'th', color: '#ffffff', bold: true, alignment: 'center' },
               { text: 'product name', style: 'th', color: '#ffffff', bold: true, alignment: 'left' },
               { text: 'Description', style: 'th', color: '#ffffff', bold: true, alignment: 'left' },
-              { text: `Unit Cost ${currency}`, style: 'th', color: '#ffffff', bold: true, alignment: 'left' },
               { text: 'Qty', style: 'th', color: '#ffffff', bold: true, alignment: 'center' },
+              { text: `Unit Cost ${currency}`, style: 'th', color: '#ffffff', bold: true, alignment: 'left' },
               { text: `Total ${currency}`, style: 'th', color: '#ffffff', bold: true, alignment: 'right' },
             ],
             ...itemRows,
@@ -526,42 +529,39 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
         },
       },
 
-      /* ======== FOOTER: Payment details + Total (kept together on one page) ======== */
+      /* ======== FOOTER: Total on the right; payment details on the left, starting level
+         with the rule under the Total; kept together on one page ======== */
       {
         unbreakable: true,
         columns: [
           {
             width: 295,
             stack: paymentDetailsBlock(settings),
+            margin: [0, TOTAL_BOX_HEIGHT, 0, 0],
           },
           {
             width: 220,
-            stack: [
-              {
-                table: {
-                  widths: ['*', 'auto'],
-                  body: [
-                    [
-                      { text: 'Total', style: 'totalLabel', border: [false, true, false, true] },
-                      { text: money(invoice.sub_amount), style: 'totalValue', alignment: 'right', border: [false, true, false, true] },
-                    ],
-                  ],
-                },
-                layout: {
-                  hLineWidth: () => 0.75,
-                  vLineWidth: () => 0,
-                  hLineColor: () => PURPLE,
-                  paddingTop: () => 8,
-                  paddingBottom: () => 8,
-                  paddingLeft: () => 8,
-                  paddingRight: () => 6,
-                },
-              },
-            ],
-            margin: [0, 4, 0, 0],
+            table: {
+              widths: ['*', 'auto'],
+              body: [
+                [
+                  { text: 'Total', style: 'totalLabel', border: [false, true, false, true] },
+                  { text: money(invoice.sub_amount), style: 'totalValue', alignment: 'right', border: [false, true, false, true] },
+                ],
+              ],
+            },
+            layout: {
+              hLineWidth: () => 0.75,
+              vLineWidth: () => 0,
+              hLineColor: () => PURPLE,
+              paddingTop: () => 8,
+              paddingBottom: () => 8,
+              paddingLeft: () => 8,
+              paddingRight: () => 6,
+            },
           },
         ],
-        margin: [0, sp.footerTopMargin, 0, 0],
+        margin: [0, sp.footerTopMargin + 4, 0, 0],
       },
     ],
 

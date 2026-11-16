@@ -187,10 +187,10 @@ export default function AddInvoice() {
     if (!customerId || !String(customerId).trim()) { setError('Please enter or select a company/customer.'); return; }
     if (!activeItems.length) { setError('Please add at least one line item.'); return; }
     if (itemsToSave.some((it) => !it.product_id || !String(it.product_id).trim())) { setError('Every line item needs a product selected.'); return; }
-    if (itemsToSave.some((it) => it.rate === '' || it.rate === null || isNaN(Number(it.rate)) || Number(it.rate) < 0)) { setError('Every line item needs a valid rate.'); return; }
+    if (itemsToSave.some((it) => it.rate === '' || it.rate === null || isNaN(Number(it.rate)))) { setError('Every line item needs a valid rate.'); return; }
     if (itemsToSave.some((it) => !Number(it.quantity) || Number(it.quantity) <= 0)) { setError('Quantity must be greater than zero.'); return; }
     if (gstOnly && !gstLinesOk) { setError(GST_REQUIRED); return; }
-    if (paid > subAmount) { setError('Paid amount cannot be more than the sub amount.'); return; }
+    if (paid > Math.max(subAmount, 0)) { setError('Paid amount cannot be more than the sub amount.'); return; }
 
     setSaving(true);
     try {
@@ -349,8 +349,8 @@ export default function AddInvoice() {
                 <tr>
                   <th style={{ width: '26%', minWidth: 180 }}>Product</th>
                   <th style={{ minWidth: 140 }}>Description</th>
-                  <th style={{ width: '12%', minWidth: 85 }}>Rate</th>
                   <th style={{ width: '10%', minWidth: 70 }}>Quantity</th>
+                  <th style={{ width: '12%', minWidth: 85 }}>Rate</th>
                   <th style={{ width: '13%', minWidth: 95 }}>Total ({currency})</th>
                   <th style={{ width: 48 }} aria-label="Actions" />
                 </tr>
@@ -377,12 +377,13 @@ export default function AddInvoice() {
                       />
                     </td>
                     <td>
-                      <input type="number" step="0.01" min="0" inputMode="decimal" value={item.rate}
-                        onChange={(e) => updateItem(idx, 'rate', e.target.value)} placeholder="0.00" />
-                    </td>
-                    <td>
                       <input type="number" step="1" min="1" inputMode="numeric" value={item.quantity}
                         onChange={(e) => updateItem(idx, 'quantity', e.target.value)} />
+                    </td>
+                    <td>
+                      {/* No minimum: a negative rate bills a discount or an adjustment line. */}
+                      <input type="number" step="0.01" value={item.rate}
+                        onChange={(e) => updateItem(idx, 'rate', e.target.value)} placeholder="0.00" />
                     </td>
                     <td>
                       <input readOnly className="num"
