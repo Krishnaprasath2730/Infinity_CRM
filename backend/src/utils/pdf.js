@@ -305,6 +305,83 @@ function getSpacing(items) {
  */
 const HEADER_RIGHT_WIDTH = 185;
 
+/** Short blue bar with a white caption, used as a block heading on the invoice. */
+function sectionBar(text, margin = [0, 0, 0, 0]) {
+  return {
+    table: {
+      widths: [150],
+      body: [[{ text, style: 'sectionBar', fillColor: PURPLE }]],
+    },
+    layout: {
+      hLineWidth: () => 0,
+      vLineWidth: () => 0,
+      paddingTop: () => 3,
+      paddingBottom: () => 3,
+      paddingLeft: () => 6,
+      paddingRight: () => 6,
+    },
+    margin,
+  };
+}
+
+/** "Label: value" line -> [label, value]; any other line -> null. */
+function parseDetailLine(line) {
+  const match = /^([^:]{1,32}):\s*(\S.*)$/.exec(line);
+  if (!match || match[2].startsWith('//')) return null; // not a URL such as https://...
+  return [match[1].trim(), match[2].trim()];
+}
+
+/**
+ * Payment instructions at the bottom of the invoice (Company Settings).
+ * Bank details typed one per line as "Label: value" are laid out as an aligned
+ * list under a PAYMENT DETAILS bar; any other line prints as plain text.
+ * Free text with no such lines, and the default cheque wording, print as before.
+ */
+function paymentDetailsBlock(settings) {
+  const lines = toLines(settings.cheque_payable_to);
+  if (!lines.length) {
+    return [
+      { text: 'All Cheques should be crossed and made payable to', style: 'payLead' },
+      { text: (settings.company_name || 'INFINITY SOLUTIONS PTE LTD').toUpperCase(), style: 'payee' },
+    ];
+  }
+  if (!lines.some(parseDetailLine)) return [{ text: settings.cheque_payable_to, style: 'payee' }];
+
+  const blocks = [sectionBar('PAYMENT DETAILS', [0, 0, 0, 6])];
+  let rows = [];
+  const flushRows = () => {
+    if (!rows.length) return;
+    blocks.push({
+      table: { widths: ['auto', 'auto', '*'], body: rows },
+      layout: {
+        hLineWidth: () => 0,
+        vLineWidth: () => 0,
+        paddingTop: () => 1.5,
+        paddingBottom: () => 1.5,
+        paddingLeft: (i) => (i === 0 ? 0 : 5),
+        paddingRight: () => 0,
+      },
+      margin: [0, 2, 0, 3],
+    });
+    rows = [];
+  };
+  for (const line of lines) {
+    const pair = parseDetailLine(line);
+    if (pair) {
+      rows.push([
+        { text: pair[0], style: 'payLabel' },
+        { text: ':', style: 'payLabel' },
+        { text: pair[1], style: 'payValue' },
+      ]);
+    } else {
+      flushRows();
+      blocks.push({ text: line, style: 'payLead' });
+    }
+  }
+  flushRows();
+  return blocks;
+}
+
 function invoiceHeaderBlock(invoice, settings, sp) {
   const line = (text) => ({ text, style: 'partyLine' });
   const invoiceNo = String(invoice.invoice_no || '').replace(/^#/, '');
@@ -335,21 +412,7 @@ function invoiceHeaderBlock(invoice, settings, sp) {
           { text: 'From:', style: 'partyLabel' },
           { text: settings.company_name || 'Infinity Solutions Pte Ltd', style: 'companyName' },
           ...companyLines,
-          {
-            table: {
-              widths: [150],
-              body: [[{ text: 'CUSTOMER INFO', style: 'customerBar', fillColor: PURPLE }]],
-            },
-            layout: {
-              hLineWidth: () => 0,
-              vLineWidth: () => 0,
-              paddingTop: () => 3,
-              paddingBottom: () => 3,
-              paddingLeft: () => 6,
-              paddingRight: () => 6,
-            },
-            margin: [0, 9, 0, 0],
-          },
+          sectionBar('CUSTOMER INFO', [0, 9, 0, 0]),
           { text: invoice.companyname || '', style: 'partyName' },
           ...customerLines,
         ],
@@ -463,24 +526,13 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
         },
       },
 
-      /* ======== FOOTER: Payment details + Total ======== */
+      /* ======== FOOTER: Payment details + Total (kept together on one page) ======== */
       {
+        unbreakable: true,
         columns: [
           {
             width: 295,
-            stack: [
-              ...(settings.cheque_payable_to
-                ? [
-                    { text: settings.cheque_payable_to, style: 'payee' }
-                  ]
-                : [
-                    { text: 'All Cheques should be crossed and made payable to', style: 'payLead' },
-                    {
-                      text: (settings.company_name || 'INFINITY SOLUTIONS PTE LTD').toUpperCase(),
-                      style: 'payee',
-                    },
-                  ]),
-            ],
+            stack: paymentDetailsBlock(settings),
           },
           {
             width: 220,
@@ -522,7 +574,7 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
       docHeading: { fontSize: 22, color: INK, margin: [0, 0, 0, 4] },
       metaHead: { fontSize: 8, bold: true, color: INK },
       metaValue: { fontSize: 9, color: INK },
-      customerBar: { fontSize: 8, bold: true, color: '#ffffff' },
+      sectionBar: { fontSize: 8, bold: true, color: '#ffffff' },
       partyName: {
         fontSize: sp.partyNameSize,
         bold: true,
@@ -537,6 +589,8 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
 
       payLead: { fontSize: 8.5, color: INK },
       payee: { fontSize: 11, bold: true, color: INK, margin: [0, 3, 0, 0] },
+      payLabel: { fontSize: 8.5, color: INK },
+      payValue: { fontSize: 8.5, bold: true, color: INK },
 
       totalLabel: { fontSize: 10, color: INK },
       totalValue: { fontSize: 10.5, bold: true, color: INK },
