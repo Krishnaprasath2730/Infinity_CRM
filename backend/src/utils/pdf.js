@@ -412,7 +412,6 @@ function invoiceHeaderBlock(invoice, settings, sp) {
       {
         width: '*',
         stack: [
-          { text: 'From:', style: 'partyLabel' },
           { text: settings.company_name || 'Infinity Solutions Pte Ltd', style: 'companyName' },
           ...companyLines,
           sectionBar('CUSTOMER INFO', [0, 9, 0, 0]),
@@ -569,7 +568,6 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
     styles: {
       wordmark: { fontSize: 15.5, bold: true, color: PURPLE, lineHeight: 1 },
 
-      partyLabel: { fontSize: sp.fromFontSize, color: INK, lineHeight: 1.35 },
       companyName: { fontSize: 13, bold: true, color: INK, margin: [0, 2, 0, 6] },
       docHeading: { fontSize: 22, color: INK, margin: [0, 0, 0, 4] },
       metaHead: { fontSize: 8, bold: true, color: INK },

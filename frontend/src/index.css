@@ -3031,3 +3031,204 @@ table.datatable td .cell-strong {
   background: linear-gradient(135deg, #0070eb, #0056b3);
   box-shadow: 0 8px 24px rgba(0, 112, 235, 0.45);
 }
+
+/* ---------------------------------------------------------------
+   Quotation document sections: the title field and the text areas
+   --------------------------------------------------------------- */
+.doc-section > input,
+.doc-section > textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--surface);
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.doc-section > input:focus,
+.doc-section > textarea:focus {
+  outline: none;
+  border-color: #0070eb !important;
+  box-shadow: 0 0 0 4px rgba(0, 112, 235, 0.14);
+}
+
+/* =====================================================================
+   Dark theme: second pass
+   Soft-tinted surfaces with a bright accent for text and icons, so badges,
+   icon buttons, banners and tiles stay readable on the dark canvas.
+   ===================================================================== */
+[data-theme="dark"] {
+  /* Native controls (date picker, select list, spin buttons, scrollbars) go dark too. */
+  color-scheme: dark;
+}
+
+/* ---- Tables: column rules match the row rules ---- */
+[data-theme="dark"] table.datatable th,
+[data-theme="dark"] table.datatable td {
+  border-right-color: #1e293b;
+}
+
+[data-theme="dark"] table.datatable th {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] table.datatable th.sortable:hover {
+  background-color: #1a2740;
+}
+
+/* ---- Badges ---- */
+[data-theme="dark"] .badge-success {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+
+[data-theme="dark"] .badge-warning {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .badge-danger {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+}
+
+[data-theme="dark"] .badge-info {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .badge-neutral {
+  background: #1e293b;
+  color: #cbd5e1;
+}
+
+/* ---- Icon buttons ---- */
+[data-theme="dark"] .btn-icon {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .icon-edit,
+[data-theme="dark"] .icon-email,
+[data-theme="dark"] .icon-print,
+[data-theme="dark"] .icon-view {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.18);
+}
+
+[data-theme="dark"] .icon-edit-orange {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.16);
+}
+
+[data-theme="dark"] .icon-delete {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.16);
+}
+
+[data-theme="dark"] .icon-excel,
+[data-theme="dark"] .btn-icon.icon-restore {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.16);
+}
+
+[data-theme="dark"] .btn-icon.icon-restore:hover {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.28);
+}
+
+[data-theme="dark"] .icon-neutral {
+  color: #cbd5e1;
+  background: #1e293b;
+}
+
+/* ---- Info banner (trash notice, admin role notice) ---- */
+[data-theme="dark"] .trash-banner {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.32);
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .trash-banner strong {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .trash-banner svg {
+  color: #60a5fa !important;
+}
+
+/* ---- Report summary tiles ---- */
+[data-theme="dark"] .summary-tile.accent {
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .summary-tile.warn {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+}
+
+/* ---- Roles: the selected role keeps its highlight ---- */
+[data-theme="dark"] .role-chip.active {
+  background: linear-gradient(135deg, #0070eb, #0056b3);
+  border-color: transparent;
+}
+
+/* ---- Quotation document sections ---- */
+[data-theme="dark"] .doc-section.is-hidden {
+  background: #0c1220;
+}
+
+[data-theme="dark"] .doc-section > input,
+[data-theme="dark"] .doc-section > textarea {
+  background: #090d16;
+  border-color: #1e293b !important;
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .doc-section > input::placeholder,
+[data-theme="dark"] .doc-section > textarea::placeholder,
+[data-theme="dark"] .line-items-table input::placeholder,
+[data-theme="dark"] .line-items-table textarea::placeholder,
+[data-theme="dark"] .search-box input::placeholder {
+  color: #64748b;
+}
+
+/* ---- Messages, toasts, dialogs, tabs, empty states ---- */
+[data-theme="dark"] .login-error {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .field-error {
+  color: #f87171;
+}
+
+[data-theme="dark"] .toast.success .toast-icon {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+
+[data-theme="dark"] .toast.error .toast-icon,
+[data-theme="dark"] .dialog-icon.danger {
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+}
+
+[data-theme="dark"] .toast.info .toast-icon {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .tab-btn.active {
+  color: #60a5fa;
+  border-bottom-color: #3b82f6;
+}
+
+[data-theme="dark"] .empty-state .empty-icon {
+  background: rgba(59, 130, 246, 0.14);
+  color: #60a5fa;
+}

@@ -181,7 +181,6 @@ export default function CompanySettings() {
             marginTop: 16, padding: 18, borderRadius: 'var(--r-md)',
             background: 'var(--line-soft)', fontSize: 12.5, lineHeight: 1.65, color: 'var(--ink-2)',
           }}>
-            <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>FROM:</div>
             <div style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 13.5 }}>{form.company_name || '—'}</div>
             <div style={{ whiteSpace: 'pre-line' }}>{form.address || '—'}</div>
             {form.tel && <div>Tel: {form.tel}</div>}
