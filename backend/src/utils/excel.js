@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const ExcelJS = require('exceljs');
 const { reportHeader } = require('./reportMeta');
+const { resolveSections, resolveVisibility, toLines: sectionLines, visibleItems } = require('./quotationSections');
 
 const LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo.png');
 const PURPLE = 'FF0070EB';
@@ -209,4 +210,271 @@ async function buildReportExcel(rows, summary, context = {}) {
   return workbook.xlsx.writeBuffer();
 }
 
-module.exports = { buildReportExcel };
+/* ============================================================
+ * Quotation workbook: the quotation document as a sheet, in the same order as
+ * the PDF (header, From / To, line items, then the sections that are shown).
+ * ============================================================ */
+
+const INK = 'FF343A40';
+// A: #, B: product name, C: description, D: unit cost.
+const QUOTE_WIDTHS = [6, 34, 46, 20];
+const QUOTE_COLS = QUOTE_WIDTHS.length;
+const LINE_HEIGHT = 14; // points per wrapped line at 10pt Arial
+
+const quoteFont = (extra = {}) => ({ name: 'Arial', size: 10, color: { argb: INK }, ...extra });
+
+function quoteDate(value) {
+  const raw = String(value || '').slice(0, 10);
+  const parts = raw.split('-');
+  if (parts.length === 3 && parts[0].length === 4) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return '';
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+}
+
+/** Combined width, in characters, of columns `from`..`to` (1-based). */
+function spanWidth(from, to) {
+  return QUOTE_WIDTHS.slice(from - 1, to).reduce((sum, width) => sum + width, 0);
+}
+
+/**
+ * Row height that shows all of `text` wrapped in a cell `widthChars` wide.
+ * Excel does not auto-fit merged cells, so the height is estimated.
+ */
+function wrappedHeight(text, widthChars, minimum = 18) {
+  const lines = String(text ?? '')
+    .split('\n')
+    .reduce((count, part) => count + Math.max(1, Math.ceil(part.length / widthChars)), 0);
+  return Math.max(minimum, lines * LINE_HEIGHT + 4);
+}
+
+/**
+ * @param {object} quotation  hydrated quotation (JSON columns parsed)
+ * @param {object} settings   company settings row
+ */
+async function buildQuotationExcel(quotation = {}, settings = {}) {
+  const currency = settings.default_currency || 'SGD';
+  const companyName = settings.company_name || 'Infinity Solutions Pte Ltd';
+  const items = visibleItems(quotation.items);
+  const vis = resolveVisibility(quotation);
+  const sections = resolveSections(quotation, {
+    currency,
+    companyName,
+    email: settings.email || 'contact@infinitysolutions.com.sg',
+    contact: settings.mobile || settings.tel || settings.contact_no || '',
+  });
+  const showDescription = vis.description;
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Infinity CRM';
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet('Quotation', {
+    views: [{ showGridLines: false }],
+    pageSetup: {
+      paperSize: 9, // A4
+      orientation: 'portrait',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
+    },
+  });
+  sheet.columns = QUOTE_WIDTHS.map((width) => ({ width }));
+
+  /** Add a row with `value` in one merged, wrapped cell spanning `from`..`to`. */
+  const block = (value, { from = 1, to = QUOTE_COLS, font = {}, horizontal = 'left', minHeight = 18 } = {}) => {
+    const row = sheet.addRow([]);
+    if (to > from) sheet.mergeCells(row.number, from, row.number, to);
+    const cell = row.getCell(from);
+    cell.value = value;
+    cell.font = quoteFont(font);
+    cell.alignment = { vertical: 'top', horizontal, wrapText: true };
+    row.height = wrappedHeight(value, spanWidth(from, to), minHeight);
+    return row;
+  };
+  const spacer = (height = 8) => { sheet.addRow([]).height = height; };
+
+  /** Blue header row. `cells` is a list of { text, from, to, horizontal }. */
+  const headerRow = (cells) => {
+    const row = sheet.addRow([]);
+    row.height = 24;
+    for (const { text, from, to = from, horizontal = 'left' } of cells) {
+      if (to > from) sheet.mergeCells(row.number, from, row.number, to);
+      for (let col = from; col <= to; col += 1) {
+        row.getCell(col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PURPLE } };
+      }
+      const cell = row.getCell(from);
+      cell.value = text;
+      cell.font = quoteFont({ bold: true, color: { argb: 'FFFFFFFF' } });
+      cell.alignment = { vertical: 'middle', horizontal, wrapText: true };
+    }
+    return row;
+  };
+
+  /** Body row under a blue header, with the same cell layout and a blue rule below. */
+  const bodyRow = (cells) => {
+    const row = sheet.addRow([]);
+    let height = 20;
+    for (const { value, from, to = from, horizontal = 'left', numFmt, font } of cells) {
+      if (to > from) sheet.mergeCells(row.number, from, row.number, to);
+      for (let col = from; col <= to; col += 1) {
+        row.getCell(col).border = { bottom: { style: 'thin', color: { argb: PURPLE } } };
+      }
+      const cell = row.getCell(from);
+      cell.value = value;
+      cell.font = quoteFont(font);
+      cell.alignment = { vertical: 'top', horizontal, wrapText: true };
+      if (numFmt) cell.numFmt = numFmt;
+      if (typeof value === 'string') height = Math.max(height, wrappedHeight(value, spanWidth(from, to), 20));
+    }
+    row.height = height;
+    return row;
+  };
+
+  /* ---- Header: logo left; title, date and number right ---- */
+  const HEADER_ROWS = 4;
+  const HEADER_ROW_HEIGHT = 22;
+  const headerLines = [
+    { text: 'QUOTATION', font: { size: 18, bold: true, color: { argb: PURPLE } } },
+    { text: `Date : ${quoteDate(quotation.quotation_date || quotation.created_at)}`, font: { size: 11, bold: true } },
+    { text: `Quotation #${String(quotation.quotation_no || '').replace(/^#/, '')}`, font: { size: 12, bold: true } },
+  ];
+  for (let i = 0; i < HEADER_ROWS; i += 1) {
+    const row = sheet.addRow([]);
+    row.height = HEADER_ROW_HEIGHT;
+    sheet.mergeCells(row.number, 3, row.number, QUOTE_COLS);
+    if (headerLines[i]) {
+      const cell = row.getCell(3);
+      cell.value = headerLines[i].text;
+      cell.font = quoteFont(headerLines[i].font);
+      cell.alignment = { vertical: 'middle', horizontal: 'right' };
+    }
+  }
+  if (logo) {
+    // Row heights are in points; image sizes are in pixels (1pt = 4/3 px).
+    const maxHeight = HEADER_ROWS * HEADER_ROW_HEIGHT * (4 / 3) - 10;
+    const scale = Math.min(maxHeight / logo.height, 240 / logo.width, 1);
+    sheet.addImage(workbook.addImage({ buffer: logo.buffer, extension: 'png' }), {
+      tl: { col: 0.2, row: 0.15 },
+      ext: { width: Math.round(logo.width * scale), height: Math.round(logo.height * scale) },
+      editAs: 'oneCell',
+    });
+  }
+  spacer(10);
+
+  /* ---- From (columns A-B) and To (columns C-D), side by side ---- */
+  const telLine = [
+    settings.tel ? `Tel: ${settings.tel}` : null,
+    settings.mobile ? `HP: ${settings.mobile}` : null,
+  ].filter(Boolean).join(' | ');
+  const fromLines = [
+    { text: 'From:' },
+    { text: companyName, bold: true },
+    settings.address ? { text: settings.address } : null,
+    telLine ? { text: telLine } : null,
+    settings.email ? { text: `Email: ${settings.email}` } : null,
+    settings.website ? { text: settings.website } : null,
+    settings.contact_no ? { text: `Contact: ${settings.contact_no}` } : null,
+  ].filter(Boolean);
+  const toLines = [
+    {
+      text: `To: ${quotation.companyname || ''}`,
+      value: {
+        richText: [
+          { text: 'To: ', font: quoteFont() },
+          { text: String(quotation.companyname || ''), font: quoteFont({ bold: true }) },
+        ],
+      },
+    },
+    { text: `Name: ${quotation.person_incharge || ''}`, bold: true },
+    { text: `Address: ${quotation.address || ''}` },
+    { text: `Phone: ${quotation.customer_contact || quotation.mobile_no || ''}` },
+  ];
+  for (let i = 0; i < Math.max(fromLines.length, toLines.length); i += 1) {
+    const row = sheet.addRow([]);
+    sheet.mergeCells(row.number, 1, row.number, 2);
+    sheet.mergeCells(row.number, 3, row.number, QUOTE_COLS);
+    let height = 16;
+    [[fromLines[i], 1, 2], [toLines[i], 3, QUOTE_COLS]].forEach(([entry, from, to]) => {
+      if (!entry) return;
+      const cell = row.getCell(from);
+      cell.value = entry.value || entry.text;
+      cell.font = quoteFont({ bold: Boolean(entry.bold) });
+      cell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+      height = Math.max(height, wrappedHeight(entry.text, spanWidth(from, to), 16));
+    });
+    row.height = height;
+  }
+  spacer(10);
+
+  /* ---- Document title (optional) ---- */
+  if (vis.doc_title && String(sections.doc_title || '').trim()) {
+    block(String(sections.doc_title).toUpperCase(), { font: { size: 12, bold: true }, horizontal: 'center', minHeight: 22 });
+    spacer(4);
+  }
+
+  /* ---- Line items (the Description column can be hidden) ---- */
+  const nameTo = showDescription ? 2 : 3;
+  headerRow([
+    { text: '#', from: 1, horizontal: 'center' },
+    { text: 'product name', from: 2, to: nameTo },
+    ...(showDescription ? [{ text: 'Description', from: 3 }] : []),
+    { text: `Unit Cost ${currency}`, from: 4, horizontal: 'right' },
+  ]);
+  if (!items.length) {
+    bodyRow([{ value: 'No items listed.', from: 1, to: QUOTE_COLS, horizontal: 'center', font: { color: { argb: MUTED } } }]);
+  }
+  items.forEach((item, idx) => {
+    bodyRow([
+      { value: idx + 1, from: 1, horizontal: 'center' },
+      { value: String(item.productname || '').toUpperCase(), from: 2, to: nameTo },
+      ...(showDescription ? [{ value: String(item.description || ''), from: 3 }] : []),
+      { value: Number(item.rate) || 0, from: 4, horizontal: 'right', numFmt: '#,##0.00' },
+    ]);
+  });
+
+  /* ---- Sections, each only when shown and not empty ---- */
+  const sectionTitle = (title, horizontal = 'left') => {
+    spacer(8);
+    block(title, { font: { bold: true }, horizontal, minHeight: 20 });
+  };
+  const section = (shown, title, lines) => {
+    if (!shown || !lines.length) return;
+    sectionTitle(title);
+    lines.forEach((text) => block(text));
+  };
+
+  section(vis.item_cost, 'Item Cost :', sectionLines(sections.item_cost));
+  if (vis.turnaround && sections.turnaround.length) {
+    sectionTitle('PERMIT TURN-AROUND TIME', 'center');
+    headerRow([
+      { text: 'Priority', from: 1, to: 2 },
+      { text: 'Permit Returning Timings', from: 3, to: QUOTE_COLS, horizontal: 'center' },
+    ]);
+    sections.turnaround.forEach((entry) => {
+      bodyRow([
+        { value: String(entry.priority || ''), from: 1, to: 2 },
+        { value: String(entry.timing || ''), from: 3, to: QUOTE_COLS, horizontal: 'center' },
+      ]);
+    });
+  }
+  section(vis.procedures, 'Procedures :', sectionLines(sections.procedures));
+  section(vis.operating_hours, 'Operating Hours :', sectionLines(sections.operating_hours));
+  section(vis.terms, 'Terms & Conditions :', sections.terms.map((term) => `•  ${term}`));
+  if (vis.closing_note && String(sections.closing_note || '').trim()) {
+    spacer(10);
+    block(String(sections.closing_note).trim());
+  }
+  section(vis.notes, 'Additional Notes :', sectionLines(quotation.notes));
+
+  spacer(16);
+  block('This is a system generated quotation, no authorized signature needed.', {
+    font: { bold: true, italic: true },
+    horizontal: 'center',
+  });
+
+  return workbook.xlsx.writeBuffer();
+}
+
+module.exports = { buildReportExcel, buildQuotationExcel };

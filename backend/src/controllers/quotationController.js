@@ -1,5 +1,6 @@
 const { query, queryOne, execute, now, numericId, likeTerm, parseJson, toJson, isDuplicateError } = require('../utils/db');
 const { buildPdf, quotationPdfDefinition } = require('../utils/pdf');
+const { buildQuotationExcel } = require('../utils/excel');
 const { cached } = require('../utils/cache');
 const { VISIBILITY_KEYS, visibleTotal } = require('../utils/quotationSections');
 const { localToday } = require('../utils/dates');
@@ -291,6 +292,24 @@ async function getPdf(req, res) {
   }
 }
 
+async function getExcel(req, res) {
+  const quotation = await findQuotation(req.params.id);
+  if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
+
+  try {
+    const buffer = await buildQuotationExcel(quotation, await getSettings());
+    // The number is user-editable; keep the header value to safe filename characters.
+    const name = String(quotation.quotation_no || quotation.id).replace(/[^A-Za-z0-9._-]+/g, '_');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="quotation-${name}.xlsx"`);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('[excel] Quotation Excel generation failed:', err);
+    res.status(500).json({ message: 'Failed to generate Excel file' });
+  }
+}
+
 module.exports = {
   list,
   getOne,
@@ -299,4 +318,5 @@ module.exports = {
   update,
   remove,
   getPdf,
+  getExcel,
 };

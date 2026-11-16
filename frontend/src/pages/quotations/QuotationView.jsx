@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { quotationsApi, settingsApi } from '../../api/endpoints';
-import { openViaApi } from '../../api/download';
+import { downloadViaApi, openViaApi } from '../../api/download';
 import { errorMessage, useToast } from '../../hooks/ToastContext';
 import { usePermissions } from '../../hooks/usePermissions';
-import { DownloadIcon, EditIcon, PrinterIcon, SpinnerIcon } from '../../components/common/Icons';
+import { DownloadIcon, EditIcon, ExcelIcon, PrinterIcon, SpinnerIcon } from '../../components/common/Icons';
 import logoImg from '../../assets/logo.png';
 import { formatDateDMY } from '../../utils/date';
 import {
@@ -35,6 +35,7 @@ export default function QuotationView() {
   const [company, setCompany] = useState({});
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingExcel, setDownloadingExcel] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -66,6 +67,19 @@ export default function QuotationView() {
       toast.error(errorMessage(err, 'Could not generate PDF'));
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    setDownloadingExcel(true);
+    try {
+      const name = String(quotation?.quotation_no || id).replace(/[^A-Za-z0-9._-]+/g, '_');
+      await downloadViaApi(`/quotations/${id}/excel`, undefined, `quotation-${name}.xlsx`);
+      toast.success('Excel downloaded');
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not generate Excel file'));
+    } finally {
+      setDownloadingExcel(false);
     }
   };
 
@@ -136,6 +150,12 @@ export default function QuotationView() {
         <button type="button" onClick={handlePrint} className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}>
           <PrinterIcon size={14} /> Print
         </button>
+        {can('quotations.print') && (
+          <button type="button" onClick={handleDownloadExcel} className="btn btn-secondary" disabled={downloadingExcel}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}>
+            {downloadingExcel ? <SpinnerIcon width={14} height={14} /> : <ExcelIcon width={14} height={14} />} Download Excel
+          </button>
+        )}
         {can('quotations.print') && (
           <button type="button" onClick={handleDownloadPdf} className="btn btn-primary" disabled={downloading}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px', fontSize: 13, fontWeight: 700 }}>

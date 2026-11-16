@@ -39,6 +39,7 @@ const printer = new PdfPrinter(fonts);
 const PURPLE = '#0070eb';
 const INK = '#343a40';
 const MUTED = '#717684';
+const HEADER_TINT = '#d6e6fb'; // light blue behind the Invoice # / DATE labels
 
 function money(value) {
   return Number(value || 0).toFixed(2);
@@ -297,17 +298,100 @@ function getSpacing(items) {
   };
 }
 
-/* ---- Invoice PDF definition (matches master reference PDF exactly) ---- */
+/**
+ * Invoice header. Left: company details, then a "CUSTOMER INFO" bar with the
+ * customer's details. Right: the INVOICE title, an Invoice # / DATE box and the
+ * logo under it.
+ */
+const HEADER_RIGHT_WIDTH = 185;
+
+function invoiceHeaderBlock(invoice, settings, sp) {
+  const line = (text) => ({ text, style: 'partyLine' });
+  const invoiceNo = String(invoice.invoice_no || '').replace(/^#/, '');
+
+  const companyLines = [];
+  if (settings.address) companyLines.push(line(settings.address));
+  if (settings.tel) companyLines.push(line(`Tel: ${settings.tel}`));
+  if (settings.mobile) companyLines.push(line(`Mobile: ${settings.mobile}`));
+  if (settings.email) companyLines.push(line(`Mail: ${settings.email}`));
+  if (settings.website) companyLines.push(line(settings.website));
+  if (settings.contact_no) companyLines.push(line(`Contact: ${settings.contact_no}`));
+
+  const customerPhone = invoice.customer_mobile || invoice.customer_contact;
+  const customerLines = [];
+  if (invoice.person_incharge) customerLines.push(line(`Attn: ${invoice.person_incharge}`));
+  if (invoice.customer_address) customerLines.push(line(invoice.customer_address));
+  if (customerPhone) customerLines.push(line(`Tel: ${customerPhone}`));
+  if (invoice.customer_email) customerLines.push(line(`Mail: ${invoice.customer_email}`));
+
+  const metaHead = (text) => ({ text, style: 'metaHead', alignment: 'center', fillColor: HEADER_TINT });
+  const metaValue = (text) => ({ text, style: 'metaValue', alignment: 'center' });
+
+  return {
+    columns: [
+      {
+        width: '*',
+        stack: [
+          { text: settings.company_name || 'Infinity Solutions Pte Ltd', style: 'companyName' },
+          ...companyLines,
+          {
+            table: {
+              widths: [150],
+              body: [[{ text: 'CUSTOMER INFO', style: 'customerBar', fillColor: PURPLE }]],
+            },
+            layout: {
+              hLineWidth: () => 0,
+              vLineWidth: () => 0,
+              paddingTop: () => 3,
+              paddingBottom: () => 3,
+              paddingLeft: () => 6,
+              paddingRight: () => 6,
+            },
+            margin: [0, 9, 0, 0],
+          },
+          { text: invoice.companyname || '', style: 'partyName' },
+          ...customerLines,
+        ],
+      },
+      {
+        width: HEADER_RIGHT_WIDTH,
+        stack: [
+          { text: 'INVOICE', style: 'docHeading', alignment: 'right' },
+          {
+            table: {
+              widths: ['*', '*'],
+              body: [
+                [metaHead('Invoice #'), metaHead('DATE')],
+                [metaValue(invoiceNo), metaValue(formatDate(invoice.invoice_date))],
+              ],
+            },
+            layout: {
+              hLineWidth: () => 0.75,
+              vLineWidth: () => 0.75,
+              hLineColor: () => INK,
+              vLineColor: () => INK,
+              paddingTop: () => 3,
+              paddingBottom: () => 3,
+              paddingLeft: () => 4,
+              paddingRight: () => 4,
+            },
+          },
+          logoBase64
+            ? { image: logoBase64, fit: [HEADER_RIGHT_WIDTH, 112], alignment: 'center', margin: [0, 8, 0, 0] }
+            : { ...logoBlock(), margin: [0, 10, 0, 0] },
+        ],
+      },
+    ],
+    columnGap: 20,
+    margin: [0, 0, 0, sp.fromToBottomMargin + 4],
+  };
+}
+
+/* ---- Invoice PDF definition ---- */
 function invoicePdfDefinition(invoice, items = [], settings = {}) {
   const currency = settings.default_currency || 'SGD';
   const uenNumber = settings.uen || '201835067C';
   const sp = getSpacing(items);
-
-  // Format invoice number defensively
-  const rawInvoiceNo = String(invoice.invoice_no || '');
-  const formattedInvoiceNo = rawInvoiceNo.startsWith('#')
-    ? `Invoice ${rawInvoiceNo}`
-    : `Invoice #${rawInvoiceNo}`;
 
   /* ---- Build item rows ---- */
   const itemRows = items.map((item, idx) => [
@@ -318,22 +402,6 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
     { text: String(Number(item.quantity || 0)), style: 'cell', alignment: 'center' },
     { text: money(item.total), style: 'cell', alignment: 'right' },
   ]);
-
-  /* ---- "From" address block ---- */
-  const fromLines = [
-    { text: settings.company_name || 'Infinity Solutions Pte Ltd', style: 'partyName' },
-  ];
-  if (settings.address) {
-    fromLines.push({ text: settings.address, style: 'partyLine' });
-  }
-  const telLine = [
-    settings.tel ? `Tel: ${settings.tel}` : null,
-    settings.mobile ? `HP: ${settings.mobile}` : null,
-  ].filter(Boolean).join(' | ');
-  if (telLine) fromLines.push({ text: telLine, style: 'partyLine' });
-  if (settings.email) fromLines.push({ text: `Email: ${settings.email}`, style: 'partyLine' });
-  if (settings.website) fromLines.push({ text: settings.website, style: 'partyLine' });
-  if (settings.contact_no) fromLines.push({ text: `Contact: ${settings.contact_no}`, style: 'partyLine' });
 
   return {
     background: (currentPage, pageSize) => {
@@ -359,64 +427,8 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
       margin: [0, 15, 0, 0],
     }),
     content: [
-      /* ======== HEADER: Logo left, Date + Invoice # straight to the right ======== */
-      {
-        columns: [
-          {
-            width: '*',
-            stack: [logoBlock()],
-          },
-          {
-            width: 'auto',
-            stack: [
-              {
-                text: [
-                  { text: 'Date : ', bold: true },
-                  { text: formatDate(invoice.invoice_date), bold: true },
-                ],
-                style: 'dateLine',
-                alignment: 'left',
-              },
-              {
-                text: formattedInvoiceNo,
-                style: 'invoiceNo',
-                alignment: 'left',
-              },
-            ],
-          },
-        ],
-        margin: [0, 0, 0, sp.headerBottomMargin],
-      },
-
-      /* ======== FROM & TO SECTION (To section moved left) ======== */
-      {
-        columns: [
-          {
-            width: 295,
-            stack: [
-              { text: 'From:', style: 'partyLabel' },
-              ...fromLines,
-            ],
-          },
-          {
-            width: 220,
-            stack: [
-              { text: `To: ${invoice.companyname || ''}`, style: 'partyLabel' },
-              {
-                text: `Name: ${invoice.person_incharge || ''}`,
-                style: 'partyName',
-                margin: [0, 4, 0, 2],
-              },
-              { text: `Address: ${invoice.customer_address || ''}`, style: 'partyLine' },
-              {
-                text: `Phone: ${invoice.customer_mobile || invoice.customer_contact || ''}`,
-                style: 'partyLine',
-              },
-            ],
-          },
-        ],
-        margin: [0, 0, 0, sp.fromToBottomMargin],
-      },
+      /* ======== HEADER: company + customer left, INVOICE / number / date / logo right ======== */
+      invoiceHeaderBlock(invoice, settings, sp),
 
       /* ======== LINE-ITEMS TABLE (Solid Purple Header with White Text) ======== */
       {
@@ -505,10 +517,12 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
     /* ======== STYLES (exact match to reference PDF) ======== */
     styles: {
       wordmark: { fontSize: 15.5, bold: true, color: PURPLE, lineHeight: 1 },
-      dateLine: { fontSize: sp.dateLineSize, bold: true, color: INK, margin: [0, 0, 0, 3] },
-      invoiceNo: { fontSize: sp.invoiceNoSize, bold: true, color: INK },
 
-      partyLabel: { fontSize: sp.fromFontSize, color: INK, bold: false },
+      companyName: { fontSize: 13, bold: true, color: INK, margin: [0, 2, 0, 9] },
+      docHeading: { fontSize: 22, color: INK, margin: [0, 0, 0, 4] },
+      metaHead: { fontSize: 8, bold: true, color: INK },
+      metaValue: { fontSize: 9, color: INK },
+      customerBar: { fontSize: 8, bold: true, color: '#ffffff' },
       partyName: {
         fontSize: sp.partyNameSize,
         bold: true,
