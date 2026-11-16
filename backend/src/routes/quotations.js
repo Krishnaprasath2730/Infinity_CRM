@@ -17,5 +17,6 @@ router.put('/:id', requirePermission('quotations.edit'), asyncHandler(ctrl.updat
 router.delete('/:id', requirePermission('quotations.delete'), asyncHandler(ctrl.remove));
 router.get('/:id/pdf', requirePermission('quotations.print'), asyncHandler(ctrl.getPdf));
 router.get('/:id/print', requirePermission('quotations.print'), asyncHandler(ctrl.getPdf));
+router.get('/:id/excel', requirePermission('quotations.print'), asyncHandler(ctrl.getExcel));
 
 module.exports = router;

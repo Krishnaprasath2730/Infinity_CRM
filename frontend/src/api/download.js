@@ -4,7 +4,8 @@ import api from './axios';
 // fetch as a blob through axios instead and trigger the save manually.
 export async function downloadViaApi(path, params, filename) {
   const res = await api.get(path, { params, responseType: 'blob' });
-  const blob = new Blob([res.data], { type: 'application/pdf' });
+  // Keep the server's type (PDF, Excel, CSV) so the saved file opens in the right app.
+  const blob = new Blob([res.data], { type: res.headers?.['content-type'] || 'application/pdf' });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

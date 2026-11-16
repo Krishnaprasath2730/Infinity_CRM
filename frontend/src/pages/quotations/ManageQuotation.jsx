@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { quotationsApi, settingsApi } from '../../api/endpoints';
-import { openViaApi } from '../../api/download';
+import { downloadViaApi, openViaApi } from '../../api/download';
 import { useDataTable } from '../../hooks/useDataTable';
 import { usePermissions } from '../../hooks/usePermissions';
 import { errorMessage, useToast } from '../../hooks/ToastContext';
@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { formatDateDMY } from '../../utils/date';
 import {
   EditIcon,
+  ExcelIcon,
   EyeIcon,
   PlusIcon,
   PrinterIcon,
@@ -25,6 +26,7 @@ export default function ManageQuotation() {
   const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [printingId, setPrintingId] = useState(null);
+  const [excelId, setExcelId] = useState(null);
   const [currency, setCurrency] = useState('SGD');
 
   const fetcher = useCallback((params) => {
@@ -66,6 +68,19 @@ export default function ManageQuotation() {
       toast.error(errorMessage(err, 'Could not generate quotation PDF'));
     } finally {
       setPrintingId(null);
+    }
+  }, [toast]);
+
+  const handleExcel = useCallback(async (row) => {
+    setExcelId(row.id);
+    try {
+      const name = String(row.quotation_no || row.id).replace(/[^A-Za-z0-9._-]+/g, '_');
+      await downloadViaApi(`/quotations/${row.id}/excel`, undefined, `quotation-${name}.xlsx`);
+      toast.success(`Quotation #${row.quotation_no || ''} Excel downloaded`);
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not generate quotation Excel'));
+    } finally {
+      setExcelId(null);
     }
   }, [toast]);
 
@@ -138,6 +153,22 @@ export default function ManageQuotation() {
             </button>
           )}
 
+          {can('quotations.print') && (
+            <button
+              type="button"
+              className="btn-icon icon-excel"
+              title="Download Excel"
+              onClick={() => handleExcel(r)}
+              disabled={excelId === r.id}
+            >
+              {excelId === r.id ? (
+                <SpinnerIcon width={15} height={15} />
+              ) : (
+                <ExcelIcon width={15} height={15} />
+              )}
+            </button>
+          )}
+
           {can('quotations.edit') && (
             <Link
               to={`/estimates/${r.id}/edit`}
@@ -161,7 +192,7 @@ export default function ManageQuotation() {
         </div>
       ),
     },
-  ], [currency, printingId, can, handlePrint]);
+  ], [currency, printingId, excelId, can, handlePrint, handleExcel]);
 
   return (
     <div>

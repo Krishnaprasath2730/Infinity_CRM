@@ -255,6 +255,11 @@ h4 {
   background: var(--purple-100);
 }
 
+.icon-excel {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
 .icon-email {
   color: var(--blue);
   background: var(--blue-soft);
