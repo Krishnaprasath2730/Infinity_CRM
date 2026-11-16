@@ -464,8 +464,8 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
     { text: String(idx + 1), style: 'cell', alignment: 'center' },
     { text: formatCellText(item.productname || '').toUpperCase(), style: 'cell', alignment: 'left' },
     { text: formatCellText(item.description || ''), style: 'cell', alignment: 'left' },
-    { text: money(item.rate), style: 'cell', alignment: 'left' },
     { text: String(Number(item.quantity || 0)), style: 'cell', alignment: 'center' },
+    { text: money(item.rate), style: 'cell', alignment: 'left' },
     { text: money(item.total), style: 'cell', alignment: 'right' },
   ]);
 
@@ -501,14 +501,14 @@ function invoicePdfDefinition(invoice, items = [], settings = {}) {
         table: {
           headerRows: 1,
           dontBreakRows: true,
-          widths: [20, 112, '*', 58, 28, 60],
+          widths: [20, 112, '*', 40, 58, 60],
           body: [
             [
               { text: '#', style: 'th', color: '#ffffff', bold: true, alignment: 'center' },
               { text: 'product name', style: 'th', color: '#ffffff', bold: true, alignment: 'left' },
               { text: 'Description', style: 'th', color: '#ffffff', bold: true, alignment: 'left' },
-              { text: `Unit Cost ${currency}`, style: 'th', color: '#ffffff', bold: true, alignment: 'left' },
               { text: 'Qty', style: 'th', color: '#ffffff', bold: true, alignment: 'center' },
+              { text: `Unit Cost ${currency}`, style: 'th', color: '#ffffff', bold: true, alignment: 'left' },
               { text: `Total ${currency}`, style: 'th', color: '#ffffff', bold: true, alignment: 'right' },
             ],
             ...itemRows,
