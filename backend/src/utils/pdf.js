@@ -308,11 +308,11 @@ const HEADER_RIGHT_WIDTH = 185;
 // payment details start this far down so their top is level with the rule under the Total.
 const TOTAL_BOX_HEIGHT = 30;
 
-/** Short blue bar with a white caption, used as a block heading on the invoice. */
+/** Blue label with a white caption, as wide as its text; a block heading on the invoice. */
 function sectionBar(text, margin = [0, 0, 0, 0]) {
   return {
     table: {
-      widths: [150],
+      widths: ['auto'],
       body: [[{ text, style: 'sectionBar', fillColor: PURPLE }]],
     },
     layout: {
@@ -857,7 +857,7 @@ function quotationPdfDefinition(quotation = {}, settings = {}) {
       /* ======== FROM & TO ======== */
       {
         columns: [
-          { width: 295, stack: [{ text: 'From:', style: 'partyLabel' }, ...fromLines] },
+          { width: 295, stack: fromLines },
           {
             width: 220,
             stack: [

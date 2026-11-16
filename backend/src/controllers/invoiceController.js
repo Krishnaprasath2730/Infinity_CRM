@@ -341,7 +341,8 @@ function validatePayload(body) {
     if (!items[index].product_id) return `Line ${index + 1}: a product must be selected`;
     // A negative rate is allowed: it bills a discount or an adjustment line.
     if (!Number.isFinite(rate) || Math.abs(rate) > MAX_AMOUNT) return `Line ${index + 1}: rate must be a number between -${MAX_AMOUNT} and ${MAX_AMOUNT}`;
-    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > MAX_AMOUNT) return `Line ${index + 1}: quantity must be greater than 0`;
+    // Zero is allowed (a no-charge line); only a negative quantity is rejected.
+    if (!Number.isFinite(quantity) || quantity < 0 || quantity > MAX_AMOUNT) return `Line ${index + 1}: quantity cannot be negative`;
   }
   const paid = Number(paid_amount || 0);
   const { subAmount } = computeTotals(items, 0);

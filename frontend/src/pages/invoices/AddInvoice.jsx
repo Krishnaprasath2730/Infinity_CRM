@@ -77,7 +77,7 @@ export default function AddInvoice() {
             product_id: (it.product_id !== undefined && it.product_id !== null && it.product_id !== 0) ? String(it.product_id) : (it.productname || ''),
             description: it.description ?? '',
             rate: it.rate !== undefined && it.rate !== null ? String(it.rate) : '',
-            quantity: it.quantity ? String(Number(it.quantity)) : '1',
+            quantity: it.quantity !== undefined && it.quantity !== null ? String(Number(it.quantity)) : '1',
           })) : defaultItems());
         } else {
           setInvoiceNo(last.data.invoice_no);
@@ -188,7 +188,8 @@ export default function AddInvoice() {
     if (!activeItems.length) { setError('Please add at least one line item.'); return; }
     if (itemsToSave.some((it) => !it.product_id || !String(it.product_id).trim())) { setError('Every line item needs a product selected.'); return; }
     if (itemsToSave.some((it) => it.rate === '' || it.rate === null || isNaN(Number(it.rate)))) { setError('Every line item needs a valid rate.'); return; }
-    if (itemsToSave.some((it) => !Number(it.quantity) || Number(it.quantity) <= 0)) { setError('Quantity must be greater than zero.'); return; }
+    // Zero is allowed for both quantity and rate (a no-charge line); only a blank or negative quantity is rejected.
+    if (itemsToSave.some((it) => it.quantity === '' || it.quantity === null || isNaN(Number(it.quantity)) || Number(it.quantity) < 0)) { setError('Every line item needs a quantity (0 or more).'); return; }
     if (gstOnly && !gstLinesOk) { setError(GST_REQUIRED); return; }
     if (paid > Math.max(subAmount, 0)) { setError('Paid amount cannot be more than the sub amount.'); return; }
 
@@ -377,7 +378,7 @@ export default function AddInvoice() {
                       />
                     </td>
                     <td>
-                      <input type="number" step="1" min="1" inputMode="numeric" value={item.quantity}
+                      <input type="number" step="1" min="0" inputMode="numeric" value={item.quantity}
                         onChange={(e) => updateItem(idx, 'quantity', e.target.value)} />
                     </td>
                     <td>

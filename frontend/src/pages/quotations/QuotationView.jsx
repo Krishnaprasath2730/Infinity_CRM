@@ -183,8 +183,7 @@ export default function QuotationView() {
         {/* FROM / TO */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 24, marginBottom: 18, fontSize: 12.5 }}>
           <div>
-            <div>From:</div>
-            <div style={{ fontWeight: 700, fontSize: 14, margin: '4px 0 2px' }}>{companyName}</div>
+            <div style={{ fontWeight: 700, fontSize: 14, margin: '0 0 2px' }}>{companyName}</div>
             {fromLines.map((line, i) => <div key={i} style={{ whiteSpace: 'pre-line' }}>{line}</div>)}
           </div>
           <div>
