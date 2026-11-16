@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { query, queryOne, execute, withTransaction, now, numericId, isDuplicateError, likeTerm } = require('../utils/db');
 const { buildPdf, invoicePdfDefinition } = require('../utils/pdf');
+const { buildInvoiceExcel } = require('../utils/excel');
 const { cached, invalidate } = require('../utils/cache');
 const { sendMail, isMailConfigured } = require('../utils/mailer');
 const { buildInvoiceEmail, cleanSubject, cleanBody, MAX_SUBJECT_LENGTH, MAX_BODY_LENGTH } = require('../utils/invoiceEmail');
@@ -593,6 +594,25 @@ async function print(req, res) {
   return res.send(buffer);
 }
 
+/** The invoice as an Excel workbook, for the same accounts that may print it. */
+async function excel(req, res) {
+  const id = numericId(req.params.id);
+  if (!id) return res.status(400).json({ message: 'Invalid invoice ID' });
+
+  const [invoice, settings] = await Promise.all([getInvoiceWithItems(id), getCompanySettings()]);
+  if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+  const denial = scopeDenial(req, 'print', invoice);
+  if (denial) return res.status(403).json({ message: denial });
+
+  const buffer = await buildInvoiceExcel(invoice, invoice.items || [], settings);
+  // The number is user-editable; keep the header value to safe filename characters.
+  const name = String(invoice.invoice_no || invoice.id).replace(/[^A-Za-z0-9._-]+/g, '_');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="invoice-${name}.xlsx"`);
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  return res.send(Buffer.from(buffer));
+}
+
 /* ============================================================
  * Email
  * ============================================================ */
@@ -705,6 +725,7 @@ module.exports = {
   restore,
   permanentDelete,
   print,
+  excel,
   emailPreview,
   emailInvoice,
   cleanupExpiredTrash,

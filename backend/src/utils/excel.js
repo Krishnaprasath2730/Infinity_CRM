@@ -3,6 +3,7 @@ const path = require('path');
 const ExcelJS = require('exceljs');
 const { reportHeader } = require('./reportMeta');
 const { resolveSections, resolveVisibility, toLines: sectionLines, visibleItems } = require('./quotationSections');
+const { parseDetailLine } = require('./paymentDetails');
 
 const LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo.png');
 const PURPLE = 'FF0070EB';
@@ -477,4 +478,215 @@ async function buildQuotationExcel(quotation = {}, settings = {}) {
   return workbook.xlsx.writeBuffer();
 }
 
-module.exports = { buildReportExcel, buildQuotationExcel };
+/* ============================================================
+ * Invoice workbook: the invoice as a sheet, laid out like the PDF (company and
+ * customer on the left; title, number / date box and logo on the right; line
+ * items; total; payment details).
+ * ============================================================ */
+
+// A: #, B: product name, C: description, D: qty, E: unit cost, F: total.
+const INVOICE_WIDTHS = [6, 30, 40, 10, 16, 16];
+const INVOICE_COLS = INVOICE_WIDTHS.length;
+const HEADER_TINT = 'FFD6E6FB'; // light blue behind the Invoice No / DATE labels
+
+/**
+ * @param {object} invoice   invoice with its customer fields (see getInvoiceWithItems)
+ * @param {Array} items      line items
+ * @param {object} settings  company settings row
+ */
+async function buildInvoiceExcel(invoice = {}, items = [], settings = {}) {
+  const currency = settings.default_currency || 'SGD';
+  const companyName = settings.company_name || 'Infinity Solutions Pte Ltd';
+  const widthOf = (from, to) => INVOICE_WIDTHS.slice(from - 1, to).reduce((sum, width) => sum + width, 0);
+  const thin = (argb) => ({ style: 'thin', color: { argb } });
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Infinity CRM';
+  workbook.created = new Date();
+  const sheet = workbook.addWorksheet('Invoice', {
+    views: [{ showGridLines: false }],
+    pageSetup: {
+      paperSize: 9, // A4
+      orientation: 'portrait',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
+    },
+  });
+  sheet.columns = INVOICE_WIDTHS.map((width) => ({ width }));
+
+  /* ---- Header, left side: company details, then the customer ---- */
+  const customerPhone = invoice.customer_mobile || invoice.customer_contact;
+  const left = [
+    { text: companyName, font: { size: 13, bold: true }, height: 22 },
+    ...sectionLines(settings.address).map((text) => ({ text })),
+    settings.tel ? { text: `Tel: ${settings.tel}` } : null,
+    settings.mobile ? { text: `Mobile: ${settings.mobile}` } : null,
+    settings.email ? { text: `Mail: ${settings.email}` } : null,
+    settings.website ? { text: settings.website } : null,
+    settings.contact_no ? { text: `Contact: ${settings.contact_no}` } : null,
+    { text: '', height: 8 },
+    { text: 'CUSTOMER INFO', label: true },
+    { text: String(invoice.companyname || ''), font: { size: 11, bold: true }, height: 19 },
+    invoice.person_incharge ? { text: `Attn: ${invoice.person_incharge}` } : null,
+    ...sectionLines(invoice.customer_address).map((text) => ({ text })),
+    customerPhone ? { text: `Tel: ${customerPhone}` } : null,
+    invoice.customer_email ? { text: `Mail: ${invoice.customer_email}` } : null,
+  ].filter(Boolean);
+
+  // Right side: title on row 1, the number / date box on rows 2-3, the logo below it.
+  const LOGO_FIRST_ROW = 4;
+  const LOGO_ROWS = 7;
+  const headerRowCount = Math.max(left.length, LOGO_FIRST_ROW - 1 + LOGO_ROWS);
+  for (let i = 0; i < headerRowCount; i += 1) {
+    const entry = left[i];
+    const row = sheet.addRow([]);
+    row.height = entry?.height || 16;
+    if (!entry) continue;
+    const cell = row.getCell(1);
+    cell.value = entry.text;
+    if (entry.label) {
+      // Heading label: a filled cell pair, like the blue label on the PDF.
+      sheet.mergeCells(row.number, 1, row.number, 2);
+      cell.font = quoteFont({ size: 9, bold: true, color: { argb: 'FFFFFFFF' } });
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PURPLE } };
+      cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    } else {
+      sheet.mergeCells(row.number, 1, row.number, 3);
+      cell.font = quoteFont(entry.font);
+      cell.alignment = { vertical: 'middle', horizontal: 'left' };
+    }
+  }
+
+  sheet.mergeCells(1, 5, 1, INVOICE_COLS);
+  const title = sheet.getCell(1, 5);
+  title.value = 'INVOICE';
+  title.font = quoteFont({ size: 20 });
+  title.alignment = { vertical: 'middle', horizontal: 'right' };
+  sheet.getRow(1).height = 28;
+
+  const metaBorder = { top: thin(INK), bottom: thin(INK), left: thin(INK), right: thin(INK) };
+  [['Invoice No', String(invoice.invoice_no || '').replace(/^#/, '')], ['DATE', quoteDate(invoice.invoice_date)]]
+    .forEach(([label, value], index) => {
+      const head = sheet.getCell(2, 5 + index);
+      head.value = label;
+      head.font = quoteFont({ size: 9, bold: true });
+      head.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_TINT } };
+      head.alignment = { vertical: 'middle', horizontal: 'center' };
+      head.border = metaBorder;
+      const body = sheet.getCell(3, 5 + index);
+      body.value = value;
+      body.font = quoteFont();
+      body.alignment = { vertical: 'middle', horizontal: 'center' };
+      body.border = metaBorder;
+    });
+  sheet.getRow(2).height = 18;
+  sheet.getRow(3).height = 18;
+
+  if (logo) {
+    // Row heights are in points; image sizes are in pixels (1pt = 4/3 px).
+    const maxHeight = LOGO_ROWS * 16 * (4 / 3) - 12;
+    const scale = Math.min(maxHeight / logo.height, 200 / logo.width, 1);
+    sheet.addImage(workbook.addImage({ buffer: logo.buffer, extension: 'png' }), {
+      tl: { col: 4.15, row: LOGO_FIRST_ROW - 1 + 0.4 },
+      ext: { width: Math.round(logo.width * scale), height: Math.round(logo.height * scale) },
+      editAs: 'oneCell',
+    });
+  }
+  sheet.addRow([]).height = 10;
+
+  /* ---- Line items ---- */
+  const headings = ['#', 'Product Name', 'Description', 'Qty', `Unit Cost ${currency}`, `Total ${currency}`];
+  const alignments = ['center', 'left', 'left', 'center', 'right', 'right'];
+  const headerRow = sheet.addRow(headings);
+  headerRow.height = 24;
+  headerRow.eachCell((cell, col) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PURPLE } };
+    cell.font = quoteFont({ bold: true, color: { argb: 'FFFFFFFF' } });
+    cell.alignment = { vertical: 'middle', horizontal: alignments[col - 1] };
+  });
+  items.forEach((item, idx) => {
+    const name = String(item.productname || '').toUpperCase();
+    const description = String(item.description || '');
+    const row = sheet.addRow([
+      idx + 1, name, description, Number(item.quantity) || 0, Number(item.rate) || 0, Number(item.total) || 0,
+    ]);
+    row.height = Math.max(20, wrappedHeight(name, INVOICE_WIDTHS[1], 20), wrappedHeight(description, INVOICE_WIDTHS[2], 20));
+    row.eachCell({ includeEmpty: true }, (cell, col) => {
+      cell.font = quoteFont();
+      cell.alignment = { vertical: 'top', horizontal: alignments[col - 1], wrapText: col === 2 || col === 3 };
+      cell.border = { bottom: thin(PURPLE) };
+      if (col >= 5) cell.numFmt = '0.00';
+    });
+  });
+
+  /* ---- Total ---- */
+  sheet.addRow([]).height = 12;
+  const totalRow = sheet.addRow([]);
+  totalRow.height = 24;
+  const totalLabel = totalRow.getCell(5);
+  totalLabel.value = 'Total';
+  totalLabel.font = quoteFont({ size: 11 });
+  totalLabel.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  const totalValue = totalRow.getCell(6);
+  totalValue.value = Number(invoice.sub_amount) || 0;
+  totalValue.numFmt = '0.00';
+  totalValue.font = quoteFont({ size: 11, bold: true });
+  totalValue.alignment = { vertical: 'middle', horizontal: 'right' };
+  [totalLabel, totalValue].forEach((cell) => { cell.border = { top: thin(PURPLE), bottom: thin(PURPLE) }; });
+
+  /* ---- Payment details (same reading of the text as the PDF) ---- */
+  const fullRow = (text, font = {}) => {
+    const row = sheet.addRow([]);
+    sheet.mergeCells(row.number, 1, row.number, INVOICE_COLS);
+    const cell = row.getCell(1);
+    cell.value = text;
+    cell.font = quoteFont(font);
+    cell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+    row.height = wrappedHeight(text, widthOf(1, INVOICE_COLS), 16);
+    return row;
+  };
+  sheet.addRow([]).height = 6;
+  const paymentLines = sectionLines(settings.cheque_payable_to);
+  if (!paymentLines.length) {
+    fullRow('All Cheques should be crossed and made payable to');
+    fullRow(companyName.toUpperCase(), { size: 11, bold: true });
+  } else if (!paymentLines.some(parseDetailLine)) {
+    paymentLines.forEach((line) => fullRow(line, { bold: true }));
+  } else {
+    const labelRow = sheet.addRow([]);
+    labelRow.height = 16;
+    sheet.mergeCells(labelRow.number, 1, labelRow.number, 2);
+    const labelCell = labelRow.getCell(1);
+    labelCell.value = 'PAYMENT DETAILS';
+    labelCell.font = quoteFont({ size: 9, bold: true, color: { argb: 'FFFFFFFF' } });
+    labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PURPLE } };
+    labelCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    paymentLines.forEach((line) => {
+      const pair = parseDetailLine(line);
+      if (!pair) { fullRow(line); return; }
+      const row = sheet.addRow([]);
+      row.height = 16;
+      sheet.mergeCells(row.number, 1, row.number, 2);
+      sheet.mergeCells(row.number, 3, row.number, INVOICE_COLS);
+      const name = row.getCell(1);
+      name.value = pair[0];
+      name.font = quoteFont();
+      name.alignment = { vertical: 'middle', horizontal: 'left' };
+      // Kept as text so account numbers and codes keep their leading zeros.
+      const value = row.getCell(3);
+      value.value = `: ${pair[1]}`;
+      value.font = quoteFont({ bold: true });
+      value.alignment = { vertical: 'middle', horizontal: 'left' };
+    });
+  }
+
+  sheet.addRow([]).height = 16;
+  const notice = fullRow('This is a system generated invoice no authorized signature needed.', { bold: true, italic: true });
+  notice.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+  return workbook.xlsx.writeBuffer();
+}
+
+module.exports = { buildReportExcel, buildQuotationExcel, buildInvoiceExcel };

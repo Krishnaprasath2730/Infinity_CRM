@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const PdfPrinter = require('pdfmake');
 const { resolveSections, resolveVisibility, toLines, visibleItems, visibleTotal, lineTotal } = require('./quotationSections');
+const { parseDetailLine } = require('./paymentDetails');
 
 const FONT_DIR = path.join(__dirname, '..', 'assets', 'fonts');
 const LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo.png');
@@ -325,13 +326,6 @@ function sectionBar(text, margin = [0, 0, 0, 0]) {
     },
     margin,
   };
-}
-
-/** "Label: value" line -> [label, value]; any other line -> null. */
-function parseDetailLine(line) {
-  const match = /^([^:]{1,32}):\s*(\S.*)$/.exec(line);
-  if (!match || match[2].startsWith('//')) return null; // not a URL such as https://...
-  return [match[1].trim(), match[2].trim()];
 }
 
 /**

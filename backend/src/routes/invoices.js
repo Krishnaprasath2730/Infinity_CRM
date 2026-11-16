@@ -22,6 +22,7 @@ router.post('/:id/restore', can('delete'), asyncHandler(ctrl.restore));
 router.delete('/:id/permanent', can('delete'), asyncHandler(ctrl.permanentDelete));
 router.delete('/:id', can('delete'), asyncHandler(ctrl.remove));
 router.get('/:id/print', can('print'), asyncHandler(ctrl.print));
+router.get('/:id/excel', can('print'), asyncHandler(ctrl.excel));
 router.get('/:id/email-preview', can('print'), asyncHandler(ctrl.emailPreview));
 router.post('/:id/email', can('print'), asyncHandler(ctrl.emailInvoice));
 

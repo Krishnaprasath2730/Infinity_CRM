@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { invoicesApi, settingsApi } from '../../api/endpoints';
-import { openViaApi, prefetchPdf, batchPrefetchPdfs, cancelBatchPrefetch } from '../../api/download';
+import { downloadViaApi, openViaApi, prefetchPdf, batchPrefetchPdfs, cancelBatchPrefetch } from '../../api/download';
 import { useDataTable } from '../../hooks/useDataTable';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useAuth } from '../../hooks/AuthContext';
@@ -13,6 +13,7 @@ import { formatDateDMY } from '../../utils/date';
 import {
   AlertIcon,
   EditIcon,
+  ExcelIcon,
   MailIcon,
   PlusIcon,
   PrinterIcon,
@@ -51,6 +52,7 @@ export default function ManageInvoice() {
   const [deleting, setDeleting] = useState(false);
   const [restoringId, setRestoringId] = useState(null);
   const [printingId, setPrintingId] = useState(null);
+  const [excelId, setExcelId] = useState(null);
   const [emailRow, setEmailRow] = useState(null);
   const [currency, setCurrency] = useState(() => getCachedCurrency() || 'SGD');
   const [counts, setCounts] = useState({ activeCount: 0, trashCount: 0 });
@@ -149,6 +151,19 @@ export default function ManageInvoice() {
     }
   }, [toast]);
 
+  const handleExcel = useCallback(async (row) => {
+    setExcelId(row.id);
+    try {
+      const name = String(row.invoice_no || row.id).replace(/[^A-Za-z0-9._-]+/g, '_');
+      await downloadViaApi(`/invoices/${row.id}/excel`, undefined, `invoice-${name}.xlsx`);
+      toast.success(`Invoice #${row.invoice_no} Excel downloaded`);
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not generate the Excel file'));
+    } finally {
+      setExcelId(null);
+    }
+  }, [toast]);
+
   // Memoized active columns — only recalculates when printingId or currency changes
   const activeColumns = useMemo(() => [
     { key: '#', label: '#', render: (_r, serial) => <span className="num text-muted">{serial}</span> },
@@ -180,6 +195,13 @@ export default function ManageInvoice() {
             </button>
           )}
           {can('invoices.print', 'gst_invoices.print') && (
+            <button className="btn-icon icon-excel" title="Download Excel"
+              disabled={excelId === row.id}
+              onClick={() => handleExcel(row)}>
+              {excelId === row.id ? <SpinnerIcon width={15} height={15} /> : <ExcelIcon width={15} height={15} />}
+            </button>
+          )}
+          {can('invoices.print', 'gst_invoices.print') && (
             <button className="btn-icon icon-email" title="Email invoice to customer"
               onClick={() => setEmailRow(row)}>
               <MailIcon width={15} height={15} />
@@ -198,7 +220,7 @@ export default function ManageInvoice() {
         </div>
       ),
     },
-  ], [printingId, currency, can, navigate, handlePrint, setEmailRow]);
+  ], [printingId, excelId, currency, can, navigate, handlePrint, handleExcel, setEmailRow]);
 
   // Memoized trash columns — only recalculates when restoringId or currency changes
   const trashColumns = useMemo(() => [
