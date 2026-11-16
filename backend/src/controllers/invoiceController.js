@@ -339,14 +339,16 @@ function validatePayload(body) {
     const rate = Number(items[index].rate);
     const quantity = Number(items[index].quantity);
     if (!items[index].product_id) return `Line ${index + 1}: a product must be selected`;
-    if (!Number.isFinite(rate) || rate < 0 || rate > MAX_AMOUNT) return `Line ${index + 1}: rate must be a number between 0 and ${MAX_AMOUNT}`;
+    // A negative rate is allowed: it bills a discount or an adjustment line.
+    if (!Number.isFinite(rate) || Math.abs(rate) > MAX_AMOUNT) return `Line ${index + 1}: rate must be a number between -${MAX_AMOUNT} and ${MAX_AMOUNT}`;
     if (!Number.isFinite(quantity) || quantity <= 0 || quantity > MAX_AMOUNT) return `Line ${index + 1}: quantity must be greater than 0`;
   }
   const paid = Number(paid_amount || 0);
   const { subAmount } = computeTotals(items, 0);
   if (!Number.isFinite(paid) || paid < 0) return 'Paid amount cannot be negative';
-  if (subAmount > MAX_AMOUNT) return 'Invoice total is too large';
-  if (paid > subAmount) return 'Paid amount cannot be more than the invoice total';
+  if (Math.abs(subAmount) > MAX_AMOUNT) return 'Invoice total is too large';
+  // With negative lines the total can be below zero; nothing can be paid against it then.
+  if (paid > Math.max(subAmount, 0)) return 'Paid amount cannot be more than the invoice total';
   return null;
 }
 
