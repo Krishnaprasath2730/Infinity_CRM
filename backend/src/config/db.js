@@ -119,6 +119,7 @@ const SCHEMA = [
      sub_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
      paid_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
      due_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+     currency VARCHAR(10) NOT NULL DEFAULT 'SGD',
      payment_type VARCHAR(50) NULL,
      payment_status VARCHAR(50) NULL,
      status VARCHAR(30) NOT NULL DEFAULT 'Unpaid',
@@ -203,6 +204,17 @@ const SCHEMA = [
 const COLUMN_ADDITIONS = [
   { table: 'invoices', column: 'created_by', ddl: 'ADD COLUMN created_by INT UNSIGNED NULL, ADD KEY idx_invoices_owner (created_by)' },
   { table: 'company_settings', column: 'cheque_payable_to', ddl: 'ADD COLUMN cheque_payable_to TEXT NULL' },
+  {
+    // Currency an invoice is billed in. Existing invoices become SGD, or the company's
+    // default currency when that is one of the other currencies an invoice may use.
+    table: 'invoices',
+    column: 'currency',
+    ddl: "ADD COLUMN currency VARCHAR(10) NOT NULL DEFAULT 'SGD' AFTER due_amount",
+    backfill: `UPDATE invoices i
+                 JOIN (SELECT UPPER(TRIM(default_currency)) AS code FROM company_settings ORDER BY id LIMIT 1) s
+                  SET i.currency = s.code
+                WHERE s.code IN ('MYR', 'AED')`,
+  },
 ];
 
 async function ensureColumns(p) {
@@ -211,7 +223,10 @@ async function ensureColumns(p) {
       'SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
       [add.table, add.column]
     );
-    if (!Number(rows[0]?.n)) await p.query(`ALTER TABLE ${add.table} ${add.ddl}`);
+    if (Number(rows[0]?.n)) continue;
+    await p.query(`ALTER TABLE ${add.table} ${add.ddl}`);
+    // Runs once, right after the column is created.
+    if (add.backfill) await p.query(add.backfill);
   }
 }
 

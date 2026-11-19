@@ -178,8 +178,8 @@ export default function ManageInvoice() {
     { key: 'companyname', label: 'Company name', render: (r) => <span className="cell-strong">{r.companyname}</span> },
     { key: 'customer_contact', label: 'Contact', render: (r) => <span className="num">{r.customer_contact || '—'}</span> },
     {
-      key: 'sub_amount', label: `Total (${currency})`, sortable: true, align: 'right',
-      render: (r) => <span className="num cell-strong">{Number(r.sub_amount).toFixed(2)}</span>,
+      key: 'sub_amount', label: 'Total', sortable: true, align: 'right',
+      render: (r) => <span className="num cell-strong">{r.currency || currency} {Number(r.sub_amount).toFixed(2)}</span>,
     },
     {
       key: 'action', label: 'Action',
@@ -247,8 +247,8 @@ export default function ManageInvoice() {
       },
     },
     {
-      key: 'sub_amount', label: `Total (${currency})`, sortable: true, align: 'right',
-      render: (r) => <span className="num cell-strong">{Number(r.sub_amount).toFixed(2)}</span>,
+      key: 'sub_amount', label: 'Total', sortable: true, align: 'right',
+      render: (r) => <span className="num cell-strong">{r.currency || currency} {Number(r.sub_amount).toFixed(2)}</span>,
     },
     {
       key: 'action', label: 'Action',

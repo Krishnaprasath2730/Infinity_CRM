@@ -5,6 +5,7 @@ import { invalidatePdfCache } from '../../api/download';
 import { errorMessage, useToast } from '../../hooks/ToastContext';
 import { useAuth } from '../../hooks/AuthContext';
 import { toDateInputValue, todayLocal } from '../../utils/date';
+import { DEFAULT_CURRENCY, INVOICE_CURRENCIES, invoiceCurrency } from '../../utils/currency';
 import { PlusIcon, SpinnerIcon, TrashIcon } from '../../components/common/Icons';
 import SearchableSelect from '../../components/common/SearchableSelect';
 
@@ -32,7 +33,10 @@ export default function AddInvoice() {
 
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
-  const [currency, setCurrency] = useState('SGD');
+  // Currency this invoice is billed in, and the one a new invoice starts with
+  // (the company's default currency when invoices can use it, otherwise SGD).
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
+  const [defaultCurrency, setDefaultCurrency] = useState(DEFAULT_CURRENCY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -61,7 +65,9 @@ export default function AddInvoice() {
         if (!alive) return;
         setCustomers(cRes.data.data);
         setProducts(pRes.data.data);
-        setCurrency(sRes.data?.default_currency || 'SGD');
+        const companyCurrency = invoiceCurrency(sRes.data?.default_currency);
+        setDefaultCurrency(companyCurrency);
+        setCurrency(isEdit ? invoiceCurrency(last.data?.currency) : companyCurrency);
 
         if (isEdit) {
           const inv = last.data;
@@ -171,6 +177,7 @@ export default function AddInvoice() {
     setItems(freshItems());
     setPaidAmount('');
     setInvoiceDate(today());
+    if (!isEdit) setCurrency(defaultCurrency);
     setError('');
     if (!isEdit) invoicesApi.nextNumber(today()).then((res) => { if (res.data?.invoice_no) setInvoiceNo(res.data.invoice_no); }).catch(() => {});
   };
@@ -238,6 +245,7 @@ export default function AddInvoice() {
       const payload = {
         invoice_no: invoiceNo.trim(),
         invoice_date: invoiceDate,
+        currency,
         customer_id: finalCustId,
         company_name: finalCustName,
         customer_contact: customerContact,
@@ -328,6 +336,13 @@ export default function AddInvoice() {
             <div className="form-field">
               <label htmlFor="invdate">Invoice Date <span className="req">*</span></label>
               <input id="invdate" type="date" value={invoiceDate} onChange={(e) => handleDateChange(e.target.value)} required />
+            </div>
+            {/* 5. Currency the invoice is billed in */}
+            <div className="form-field">
+              <label htmlFor="currency">Currency <span className="req">*</span></label>
+              <select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                {INVOICE_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+              </select>
             </div>
           </div>
         </div>

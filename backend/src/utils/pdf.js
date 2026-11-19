@@ -3,7 +3,7 @@ const path = require('path');
 const PdfPrinter = require('pdfmake');
 const { resolveSections, resolveVisibility, toLines, visibleItems, visibleTotal, lineTotal } = require('./quotationSections');
 const { parseDetailLine } = require('./paymentDetails');
-const { currencySymbol } = require('./currency');
+const { currencySymbol, invoiceCurrency, totalsByCurrency } = require('./currency');
 
 const FONT_DIR = path.join(__dirname, '..', 'assets', 'fonts');
 const LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo.png');
@@ -324,9 +324,15 @@ const TOTAL_VALUE_SIZE = 10.5;
 // the two gaps and the label ("Total Amount" in 10pt Lato Bold is 60pt wide).
 const TOTAL_VALUE_ROOM = TOTAL_BOX_WIDTH - ITEM_CELL_PADDING * 2 - TOTAL_GAP - TOTAL_SYMBOL_GAP - 60;
 
-/** Rough width of text such as "S$" or "12297.00" in Lato Bold, in ems (slightly generous). */
+/**
+ * Rough width of text such as "S$", "AED" or "12297.00" in Lato Bold, in ems
+ * (slightly generous): capitals are wider than digits, punctuation is narrow.
+ */
 function estimateEms(text) {
-  return [...String(text)].reduce((sum, ch) => sum + (ch === '.' || ch === ' ' || ch === ',' ? 0.26 : 0.6), 0);
+  return [...String(text)].reduce((sum, ch) => {
+    if (ch === '.' || ch === ' ' || ch === ',') return sum + 0.26;
+    return sum + (/[A-Z]/.test(ch) ? 0.72 : 0.6);
+  }, 0);
 }
 
 /** Blue label with a white caption, as wide as its text; a block heading on the invoice. */
@@ -470,7 +476,8 @@ function invoiceHeaderBlock(invoice, settings, sp) {
 
 /* ---- Invoice PDF definition ---- */
 function invoicePdfDefinition(invoice, items = [], settings = {}) {
-  const currency = settings.default_currency || 'SGD';
+  // The currency this invoice is billed in (SGD unless another was chosen on the invoice).
+  const currency = invoiceCurrency(invoice);
   const sp = getSpacing(items);
 
   // Total: the currency symbol sits right after the label and the amount is right-aligned.
@@ -649,6 +656,14 @@ function reportPdfDefinition(rows, filters, summary) {
     'Invoice No': filters.invoiceNo,
   }).filter(([, v]) => v && v !== 'All').map(([k, v]) => `${k}: ${v}`).join('   •   ');
 
+  // One total per currency: amounts in different currencies are never added together.
+  const totals = summary?.byCurrency?.length
+    ? summary.byCurrency.map((entry) => ({ currency: entry.currency, total: entry.totalAmount }))
+    : totalsByCurrency(rows);
+  const totalsLabel = totals.length
+    ? totals.map((entry) => `${entry.currency} ${money(entry.total)}`).join('   |   ')
+    : money(0);
+
   const body = [
     [
       { text: 'Invoice No', style: 'th', alignment: 'left', color: '#ffffff', bold: true },
@@ -663,7 +678,7 @@ function reportPdfDefinition(rows, filters, summary) {
       { text: formatDate(r.invoice_date), style: 'cell', alignment: 'left' },
       { text: r.companyname, style: 'cell', alignment: 'left' },
       { text: r.description || '', style: 'cell', alignment: 'left' },
-      { text: money(r.sub_amount), style: 'cell', alignment: 'right' },
+      { text: `${invoiceCurrency(r)} ${money(r.sub_amount)}`, style: 'cell', alignment: 'right' },
       { text: (r.status && String(r.status).toLowerCase() === 'pending') ? 'Unpaid' : (r.status || ''), style: 'cell', alignment: 'center' },
     ]),
   ];
@@ -720,7 +735,7 @@ function reportPdfDefinition(rows, filters, summary) {
       {
         columns: [
           { text: `${rows.length} invoice${rows.length === 1 ? '' : 's'}`, style: 'summary' },
-          { text: `Total Amount: ${money(summary.totalAmount)}`, style: 'summary', alignment: 'right' },
+          { text: `Total Amount: ${totalsLabel}`, style: 'summary', alignment: 'right' },
         ],
         margin: [0, 16, 0, 0],
       },

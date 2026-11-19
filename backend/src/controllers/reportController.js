@@ -3,6 +3,7 @@ const { ownerScope } = require('../utils/authz');
 const { buildPdf, reportPdfDefinition } = require('../utils/pdf');
 const { buildReportExcel } = require('../utils/excel');
 const { buildReportCsv } = require('../utils/csv');
+const { INVOICE_CURRENCIES, invoiceCurrency } = require('../utils/currency');
 
 const PREVIEW_LIMIT = 500;
 const EXPORT_LIMIT = 10000;
@@ -32,15 +33,39 @@ function buildWhere(filters, ownerId) {
   return { where: conditions.join(' AND '), params };
 }
 
+/** Per-currency totals in the order of INVOICE_CURRENCIES; unknown codes count as the default. */
+function groupByCurrency(groups) {
+  const merged = new Map();
+  for (const group of groups || []) {
+    const currency = invoiceCurrency(group);
+    const entry = merged.get(currency) || { currency, count: 0, totalAmount: 0, totalDue: 0 };
+    entry.count += Number(group.count || 0);
+    entry.totalAmount += Number(group.totalAmount || 0);
+    entry.totalDue += Number(group.totalDue || 0);
+    merged.set(currency, entry);
+  }
+  const round2 = (value) => Math.round(value * 100) / 100;
+  return INVOICE_CURRENCIES.filter((code) => merged.has(code)).map((code) => {
+    const entry = merged.get(code);
+    return { ...entry, totalAmount: round2(entry.totalAmount), totalDue: round2(entry.totalDue) };
+  });
+}
+
 async function runQuery(filters, limit, ownerId) {
   const { where, params } = buildWhere(filters, ownerId);
   const from = 'FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id';
 
-  const [totals, rows] = await Promise.all([
+  const [totals, currencyTotals, rows] = await Promise.all([
     queryOne(`SELECT COUNT(*) AS count, COALESCE(SUM(i.sub_amount), 0) AS totalAmount, COALESCE(SUM(i.due_amount), 0) AS totalDue ${from} WHERE ${where}`, params),
+    // Totals per currency over every matching invoice (not just the rows returned).
+    query(
+      `SELECT i.currency, COUNT(*) AS count, COALESCE(SUM(i.sub_amount), 0) AS totalAmount, COALESCE(SUM(i.due_amount), 0) AS totalDue
+         ${from} WHERE ${where} GROUP BY i.currency`,
+      params
+    ),
     query(
       `SELECT i.id, i.invoice_no, i.invoice_date, i.customer_id, i.customer_contact, i.sub_amount, i.paid_amount, i.due_amount,
-              i.payment_type, i.payment_status, i.status, i.is_gst_bill, c.companyname
+              i.currency, i.payment_type, i.payment_status, i.status, i.is_gst_bill, c.companyname
          ${from} WHERE ${where}
         ORDER BY i.invoice_date DESC, i.id DESC
         LIMIT ?`,
@@ -67,13 +92,20 @@ async function runQuery(filters, limit, ownerId) {
 
   const mappedRows = rows.map((r) => ({
     ...r,
+    currency: invoiceCurrency(r),
     description: (descriptions.get(r.id) || []).join('\n'),
     status: (r.status && String(r.status).toLowerCase() === 'pending') ? 'Unpaid' : (r.status || 'Unpaid'),
   }));
   const count = Number(totals?.count || 0);
   return {
     rows: mappedRows,
-    summary: { totalAmount: Number(totals?.totalAmount || 0), totalDue: Number(totals?.totalDue || 0) },
+    // Amounts in different currencies are never added together: use byCurrency for totals.
+    // (totalAmount / totalDue are the plain sums, kept for older clients.)
+    summary: {
+      totalAmount: Number(totals?.totalAmount || 0),
+      totalDue: Number(totals?.totalDue || 0),
+      byCurrency: groupByCurrency(currencyTotals),
+    },
     count,
     truncated: count > mappedRows.length,
   };

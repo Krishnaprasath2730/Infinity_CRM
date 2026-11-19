@@ -4,7 +4,7 @@ const ExcelJS = require('exceljs');
 const { reportHeader } = require('./reportMeta');
 const { resolveSections, resolveVisibility, toLines: sectionLines, visibleItems } = require('./quotationSections');
 const { parseDetailLine } = require('./paymentDetails');
-const { currencySymbol } = require('./currency');
+const { currencySymbol, invoiceCurrency, totalsByCurrency } = require('./currency');
 
 const LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo.png');
 const PURPLE = 'FF0070EB';
@@ -83,9 +83,14 @@ function addLetterhead(workbook, sheet, header) {
   sheet.addRow([]); // Blank spacer
 }
 
+/** Number format that shows an amount with its currency code, e.g. "SGD 1,200.00". */
+function amountFormat(currency) {
+  return `"${String(currency).replace(/"/g, '""')} "#,##0.00`;
+}
+
 /**
  * @param {Array} rows      report rows
- * @param {object} summary  { totalAmount }
+ * @param {object} summary  { byCurrency: [{ currency, totalAmount }] } (optional; else summed from rows)
  * @param {{filters?: object, settings?: object}} context  filters used and company settings
  */
 async function buildReportExcel(rows, summary, context = {}) {
@@ -169,7 +174,8 @@ async function buildReportExcel(rows, summary, context = {}) {
       };
 
       if (colNum === 5) {
-        cell.numFmt = '#,##0.00';
+        // Still a number; the invoice's currency code is part of the cell format.
+        cell.numFmt = amountFormat(invoiceCurrency(r));
         cell.alignment = { vertical: 'middle', horizontal: 'right' };
       } else if (colNum === 6) {
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -181,32 +187,38 @@ async function buildReportExcel(rows, summary, context = {}) {
     });
   });
 
-  // Totals Row
-  const totalAmount = summary?.totalAmount !== undefined
-    ? Number(summary.totalAmount)
-    : rows.reduce((acc, r) => acc + (Number(r.sub_amount) || 0), 0);
+  // Totals: one row per currency, because amounts in different currencies cannot be added.
+  const totals = summary?.byCurrency?.length
+    ? summary.byCurrency.map((entry) => ({ currency: entry.currency, total: Number(entry.totalAmount) || 0 }))
+    : totalsByCurrency(rows);
+  if (!totals.length) totals.push({ currency: invoiceCurrency(), total: 0 });
 
-  const totalRow = sheet.addRow(['Total Amount', '', '', '', totalAmount, '']);
-  totalRow.height = 24;
+  totals.forEach((entry, index) => {
+    const label = totals.length > 1 ? `Total Amount (${entry.currency})` : 'Total Amount';
+    const totalRow = sheet.addRow([label, '', '', '', entry.total, '']);
+    totalRow.height = 24;
+    const isFirst = index === 0;
+    const isLast = index === totals.length - 1;
 
-  totalRow.eachCell((cell, colNum) => {
-    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF343A40' } };
-    cell.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFF2E6F4' },
-    };
-    cell.border = {
-      top: { style: 'medium', color: { argb: PURPLE } },
-      bottom: { style: 'double', color: { argb: PURPLE } },
-    };
+    totalRow.eachCell((cell, colNum) => {
+      cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF343A40' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF2E6F4' },
+      };
+      cell.border = {
+        ...(isFirst ? { top: { style: 'medium', color: { argb: PURPLE } } } : {}),
+        ...(isLast ? { bottom: { style: 'double', color: { argb: PURPLE } } } : {}),
+      };
 
-    if (colNum === 5) {
-      cell.numFmt = '#,##0.00';
-      cell.alignment = { vertical: 'middle', horizontal: 'right' };
-    } else {
-      cell.alignment = { vertical: 'middle', horizontal: 'left' };
-    }
+      if (colNum === 5) {
+        cell.numFmt = amountFormat(entry.currency);
+        cell.alignment = { vertical: 'middle', horizontal: 'right' };
+      } else {
+        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+      }
+    });
   });
 
   return workbook.xlsx.writeBuffer();
@@ -495,7 +507,8 @@ const INVOICE_COLS = INVOICE_WIDTHS.length;
  * @param {object} settings  company settings row
  */
 async function buildInvoiceExcel(invoice = {}, items = [], settings = {}) {
-  const currency = settings.default_currency || 'SGD';
+  // The currency this invoice is billed in (SGD unless another was chosen on the invoice).
+  const currency = invoiceCurrency(invoice);
   const companyName = settings.company_name || 'Infinity Solutions Pte Ltd';
   const widthOf = (from, to) => INVOICE_WIDTHS.slice(from - 1, to).reduce((sum, width) => sum + width, 0);
   const thin = (argb) => ({ style: 'thin', color: { argb } });

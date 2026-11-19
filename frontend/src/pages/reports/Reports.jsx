@@ -206,10 +206,16 @@ export default function Reports() {
               <span>Invoices</span>
               <strong className="num">{results.count}</strong>
             </div>
-            <div className="summary-tile accent">
-              <span>Total Amount</span>
-              <strong className="num">{currency} {results.summary.totalAmount.toFixed(2)}</strong>
-            </div>
+            {/* One total per currency: amounts in different currencies are not added together. */}
+            {(results.summary.byCurrency?.length
+              ? results.summary.byCurrency
+              : [{ currency, totalAmount: results.summary.totalAmount }]
+            ).map((entry, _i, all) => (
+              <div className="summary-tile accent" key={entry.currency}>
+                <span>{all.length > 1 ? `Total Amount (${entry.currency})` : 'Total Amount'}</span>
+                <strong className="num">{entry.currency} {Number(entry.totalAmount).toFixed(2)}</strong>
+              </div>
+            ))}
           </div>
 
           <div className="table-scroll">
@@ -241,7 +247,7 @@ export default function Reports() {
                     <td className="num">{formatDateDMY(r.invoice_date)}</td>
                     <td>{r.companyname}</td>
                     <td style={{ whiteSpace: 'pre-line', fontSize: 12.5, lineHeight: 1.4 }}>{r.description || <span className="text-muted">–</span>}</td>
-                    <td className="num" style={{ textAlign: 'right' }}>{Number(r.sub_amount).toFixed(2)}</td>
+                    <td className="num" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{r.currency || currency} {Number(r.sub_amount).toFixed(2)}</td>
                     <td style={{ textAlign: 'center' }}><span className="badge badge-neutral">{(!r.status || String(r.status).toLowerCase() === 'pending') ? 'Unpaid' : r.status}</span></td>
                   </tr>
                 ))}

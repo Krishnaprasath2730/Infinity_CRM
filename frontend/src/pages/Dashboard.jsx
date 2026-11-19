@@ -28,18 +28,34 @@ export default function Dashboard() {
   // API already limits the numbers, the cards are just labelled to match.
   const gstScope = summary ? summary.scope === 'gst' : gstOnly;
 
+  // Revenue is kept per currency. With invoices in more than one currency the card
+  // lists each on its own line; amounts in different currencies are never added together.
+  const revenueLines = summary?.revenueByCurrency?.length
+    ? summary.revenueByCurrency
+    : (summary ? [{ currency, revenue: summary.totalRevenue }] : []);
+  let revenueValue = null;
+  if (revenueLines.length > 1) {
+    revenueValue = (
+      <span className="stat-multi">
+        {revenueLines.map((line) => <span key={line.currency}>{line.currency} {line.revenue}</span>)}
+      </span>
+    );
+  } else if (revenueLines.length === 1) {
+    revenueValue = `${revenueLines[0].currency} ${revenueLines[0].revenue}`;
+  }
+
   const cards = gstScope
     ? [
       { label: 'Total client', value: summary?.totalClients, icon: StatClientIcon, gradient: 'linear-gradient(135deg,#3fae4a,#2d8f38)' },
       { label: 'Total GST Invoices', value: summary?.totalInvoices, icon: StatGstIcon, gradient: 'linear-gradient(135deg,#8b46e0,#6b1fc9)' },
-      { label: 'GST Revenue', value: summary ? `${currency} ${summary.totalRevenue}` : null, icon: StatRevenueIcon, gradient: 'linear-gradient(135deg,#14b8a6,#0d7c72)' },
+      { label: 'GST Revenue', value: revenueValue, icon: StatRevenueIcon, gradient: 'linear-gradient(135deg,#14b8a6,#0d7c72)' },
     ]
     : [
       { label: 'Total client', value: summary?.totalClients, icon: StatClientIcon, gradient: 'linear-gradient(135deg,#3fae4a,#2d8f38)' },
       { label: 'Total Product', value: summary?.totalProducts, icon: StatBoxIcon, gradient: 'linear-gradient(135deg,#9a9a2e,#6f6f19)' },
       { label: 'Total Invoices', value: summary?.totalInvoices, icon: StatDocIcon, gradient: 'linear-gradient(135deg,#e0287a,#b81c61)' },
       { label: 'Total GST Bills', value: summary?.totalGstBills, icon: StatGstIcon, gradient: 'linear-gradient(135deg,#8b46e0,#6b1fc9)' },
-      { label: 'Total Revenue', value: summary ? `${currency} ${summary.totalRevenue}` : null, icon: StatRevenueIcon, gradient: 'linear-gradient(135deg,#14b8a6,#0d7c72)' },
+      { label: 'Total Revenue', value: revenueValue, icon: StatRevenueIcon, gradient: 'linear-gradient(135deg,#14b8a6,#0d7c72)' },
     ];
 
   return (

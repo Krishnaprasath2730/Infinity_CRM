@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { query, queryOne, execute, withTransaction, now, numericId, isDuplicateError, likeTerm } = require('../utils/db');
 const { buildPdf, invoicePdfDefinition } = require('../utils/pdf');
 const { buildInvoiceExcel } = require('../utils/excel');
+const { DEFAULT_CURRENCY, INVOICE_CURRENCIES, isInvoiceCurrency, invoiceCurrency } = require('../utils/currency');
 const { cached, invalidate } = require('../utils/cache');
 const { sendMail, isMailConfigured } = require('../utils/mailer');
 const { buildInvoiceEmail, cleanSubject, cleanBody, MAX_SUBJECT_LENGTH, MAX_BODY_LENGTH } = require('../utils/invoiceEmail');
@@ -139,7 +140,7 @@ function lruSet(key, value) {
 
 function getInvoicePdfCacheKey(invoice) {
   const itemsHash = (invoice.items || []).map((it) => `${it.product_id || it.productname || ''}:${it.description || ''}:${it.rate || ''}:${it.quantity || ''}`).join('|');
-  return `${invoice.id}:${invoice.version ?? 0}:${invoice.updated_at || invoice.created_at || ''}:${invoice.status || ''}:${invoice.sub_amount || ''}:${itemsHash}`;
+  return `${invoice.id}:${invoice.version ?? 0}:${invoice.updated_at || invoice.created_at || ''}:${invoice.status || ''}:${invoice.currency || ''}:${invoice.sub_amount || ''}:${itemsHash}`;
 }
 
 function computeETag(cacheKey) {
@@ -189,7 +190,7 @@ async function scopeDenialById(req, action, id) {
  * ============================================================ */
 
 const LIST_COLUMNS = `i.id, i.invoice_no, i.invoice_date, i.customer_id, i.customer_contact, i.sub_amount, i.paid_amount,
-  i.due_amount, i.payment_type, i.payment_status, i.status, i.is_gst_bill, i.is_gst_only, i.version, i.created_by, i.created_at,
+  i.due_amount, i.currency, i.payment_type, i.payment_status, i.status, i.is_gst_bill, i.is_gst_only, i.version, i.created_by, i.created_at,
   i.updated_at, i.is_deleted, i.deleted_at, c.companyname, u.username AS created_by_username`;
 
 const normaliseStatus = (status) => ((status && String(status).toLowerCase() === 'pending') ? 'Unpaid' : (status || 'Unpaid'));
@@ -324,6 +325,8 @@ const computeTotals = (items, paid) => {
   return { subAmount, dueAmount: round2(Math.max(subAmount - Number(paid || 0), 0)) };
 };
 
+const hasValue = (value) => value !== undefined && value !== null && String(value).trim() !== '';
+
 function validatePayload(body) {
   const { invoice_no, invoice_date, customer_id, items, paid_amount } = body;
   const missing = [];
@@ -332,6 +335,8 @@ function validatePayload(body) {
   const custId = numericId(customer_id);
   const companyName = String(body.company_name || customer_id || '').trim();
   if (!custId && !companyName) missing.push('Company/Customer');
+  // Optional: left out, the invoice is billed in the default currency (or keeps its own on edit).
+  if (hasValue(body.currency) && !isInvoiceCurrency(body.currency)) return `Currency must be one of ${INVOICE_CURRENCIES.join(', ')}`;
   if (!Array.isArray(items) || !items.length) missing.push('At least one line item');
   if (missing.length) return `${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required.`;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(invoice_date))) return 'Invoice date must be a valid date (YYYY-MM-DD)';
@@ -407,6 +412,7 @@ async function create(req, res) {
   if (invalid) return res.status(400).json({ message: invalid });
   const { invoice_no, invoice_date, customer_contact, items, paid_amount, payment_type, payment_status, status } = req.body;
   const { subAmount, dueAmount } = computeTotals(items, paid_amount);
+  const currency = hasValue(req.body.currency) ? String(req.body.currency).trim().toUpperCase() : DEFAULT_CURRENCY;
 
   // Checked before anything is written so a rejected request from a GST-only
   // account leaves no trace behind.
@@ -429,10 +435,10 @@ async function create(req, res) {
         if (!customer) return { error: 'Selected company/customer was not found. Please choose or enter an existing customer.' };
 
         const result = await tx.execute(
-          `INSERT INTO invoices (invoice_no, invoice_date, customer_id, customer_contact, sub_amount, paid_amount, due_amount, payment_type,
+          `INSERT INTO invoices (invoice_no, invoice_date, customer_id, customer_contact, sub_amount, paid_amount, due_amount, currency, payment_type,
              payment_status, status, is_gst_bill, is_gst_only, is_deleted, deleted_at, version, created_by, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 0, ?, ?, ?)`,
-          [invoiceNo, invoice_date, customer.id, customer_contact || null, subAmount, Number(paid_amount || 0), dueAmount,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 0, ?, ?, ?)`,
+          [invoiceNo, invoice_date, customer.id, customer_contact || null, subAmount, Number(paid_amount || 0), dueAmount, currency,
             payment_type || null, payment_status || null, normaliseStatus(status), gst.gstBill ? 1 : 0, gst.gstOnly ? 1 : 0,
             req.user?.id || null, now(), now()]
         );
@@ -475,6 +481,8 @@ async function update(req, res) {
   }
 
   const nextStatus = status ? normaliseStatus(status) : normaliseStatus(existing.status);
+  // An edit that does not mention the currency keeps the one the invoice already has.
+  const currency = hasValue(req.body.currency) ? String(req.body.currency).trim().toUpperCase() : invoiceCurrency(existing);
 
   try {
     const outcome = await withTransaction(async (tx) => {
@@ -483,9 +491,9 @@ async function update(req, res) {
 
       await tx.execute(
         `UPDATE invoices SET invoice_no = ?, invoice_date = ?, customer_id = ?, customer_contact = ?, sub_amount = ?, paid_amount = ?,
-           due_amount = ?, payment_type = ?, payment_status = ?, status = ?, is_gst_bill = ?, is_gst_only = ?, updated_at = ?, version = version + 1
+           due_amount = ?, currency = ?, payment_type = ?, payment_status = ?, status = ?, is_gst_bill = ?, is_gst_only = ?, updated_at = ?, version = version + 1
          WHERE id = ?`,
-        [String(invoice_no).trim(), invoice_date, customer.id, customer_contact || null, subAmount, Number(paid_amount || 0), dueAmount,
+        [String(invoice_no).trim(), invoice_date, customer.id, customer_contact || null, subAmount, Number(paid_amount || 0), dueAmount, currency,
           payment_type || null, payment_status || null, nextStatus, gst.gstBill ? 1 : 0, gst.gstOnly ? 1 : 0, now(), id]
       );
       await tx.execute('DELETE FROM invoice_items WHERE invoice_id = ?', [id]);
